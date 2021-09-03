@@ -1,7 +1,5 @@
 ;┌═══════════════════════════════════════════════════════════════════════════┐
-;│▒▓█  TANDY3 & PCjr sound generator (TI SN 76496N) & DISNEY SS emulator  █▓▒│
-;│▒▓█             for Covox Speech Thing|PC Squeaker & 386 CPU            █▓▒│
-;│▒▓█          Version 3.03 (C)opyright 1993 by FRIENDS software          █▓▒│
+;│▒▓█  Tool for logging access to a range of ports                        █▓▒│
 ;└═══════════════════════════════════════════════════════════════════════════┘
 
                 .SALL
