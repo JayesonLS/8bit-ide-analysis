@@ -1,8 +1,6 @@
-;░▒▓█▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀█▓▒░
-;░▒▓█         Disney Sound Source emulator for Covox & PC-Squeaker        █▓▒░
-;░▒▓█                (C)opyleft 1993 by FRIENDS software                  █▓▒░
-;░▒▓█                          Port handler                               █▓▒░
-;░▒▓█▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄█▓▒░
+; Tool for logging access to a range of ports
+
+; Port handler
 
 
 PortHandler     proc    near

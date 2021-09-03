@@ -1,6 +1,4 @@
-;┌═══════════════════════════════════════════════════════════════════════════┐
-;│▒▓█  Tool for logging access to a range of ports                        █▓▒│
-;└═══════════════════════════════════════════════════════════════════════════┘
+; Tool for logging access to a range of ports
 
                 .SALL
                 .MODEL  TINY
