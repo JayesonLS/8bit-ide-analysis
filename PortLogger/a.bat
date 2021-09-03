@@ -5,7 +5,6 @@ rem
 rem mount c c:\dev\img\dosbox-c-drive
 rem mount d c:\dev\8bit-ide-analysis\PortLogger
 rem d:
-rem cd Logger
 rem
 rem TASM 5 should be installed to dosbox-c-device\TASM
 

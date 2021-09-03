@@ -31,6 +31,7 @@ IntNo		=	IntNo + 1
 
 ;**** If we made it here, we have an hardware or an unexpected interrupt *****
 ;**************** so crank out a debug dump and exit to dos ******************
+
 IntDump:	cmp	byte ptr [esp],6
 		jbe	EmulateInt		; Emulate INTs 0, 1, 3 ...
 		cmp	byte ptr [esp],20h
@@ -48,8 +49,6 @@ NotIO:		pushad
 		mov	ds,ax
 ; do dump
 		call	CRLF
-		mov	bx,offset UnexpInt
-		call	WriteMsg
 		mov	cx,5
 		mov	bx,offset RTable
 IntL1:		mov	al,[bx]
@@ -229,23 +228,6 @@ InLoop: 	mov	ah,[ebx]
 		cmp	ah,66h	     ; opsize prefix
 		je	FSet
 
-; Scan for instructions
-;		 cmp	 ah,9Dh
-;		 je	 DoPopf
-;		 cmp	 ah,9Ch
-;		 je	 DoPushf
-;		 cmp	 ah,0FAh
-;		 je	 DoCli
-;		 cmp	 ah,0FBh
-;		 je	 DoSti
-;		 cmp	 ah,0CCh
-;		 je	 DoInt03
-;		 cmp	 ah,0CDh
-;		 je	 DoIntNN
-;		 cmp	 ah,0CFh
-;		 je	 DoIret
-;		 cmp	 ah,0F0h
-;		 je	 DoLock
 
 IfDef		PortHandler
 %		Include PortHandler

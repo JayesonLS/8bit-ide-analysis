@@ -21,14 +21,13 @@ Temp2           dd      ?                       ; temporary
 Temp3           dd      ?                       ;  variables
 Temp4           dd      ?                       ;   for ISRs
 ;*************************** Debug dump messages *****************************
-UnexpInt        db      '───═══■ Debug interrupt ■═══───',13,10,0
 TaskMsg         db      'TR=',0
 UnexpMsg        db      ' INT=',0
 StackMsg        db      'Stack:',0
 RTable          db      'GFDES'
 GTable          db      'DISIBPSPBXDXCXAX'
 MemMsg          db      'Memory dump; Selector=',0
-GPFmsg          db      'GPF; opcode = ',0
+GPFmsg          db      'FATAL: General protection fault!',10,13,'Opcode = ',0
 IntController   db      'Interrupt controller #'
 IntContNo       db      '1 mask = ',0
 
