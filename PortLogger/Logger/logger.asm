@@ -13,7 +13,7 @@
 
 DSSbufferSize   equ     128
 DSSbufferMask   equ     DSSbufferSize-1
-PortHandler     equ     <t386port.asm>
+PortHandler     equ     <l386port.asm>
 StartFreq       equ     050h
 
 Start:          jmp     Init
@@ -514,6 +514,6 @@ Init:           call    CheckCPU
 
                 include ../386rdata.asm         ; Real-mode data
                 include ../386preal.asm         ; Then real-mode subroutines
-                include t386data.asm
+                include l386data.asm
 
                 end     Start

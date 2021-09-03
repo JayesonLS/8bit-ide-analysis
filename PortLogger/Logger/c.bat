@@ -5,11 +5,19 @@ rem
 rem mount c c:\dev\img\dosbox-c-drive
 rem mount d c:\dev\8bit-ide-analysis\PortLogger
 rem d:
+rem cd Logger
 rem
 rem TASM 5 should be installed to dosbox-c-device\TASM
 
-c:\tasm\bin\tasm temu
-c:\tasm\bin\tlink /Tdc /3 temu.obj
+c:\tasm\bin\tasm logger
+if not ERRORLEVEL 0 goto exit
+
+c:\tasm\bin\tlink /Tdc /3 logger.obj
+if not ERRORLEVEL 0 goto exit
+
+echo.
 imgmount a c:\dev\img\dos622_144_boot.img -t floppy
-copy temu.com a:
+copy logger.com a:
 imgmount -u a
+
+:exit
