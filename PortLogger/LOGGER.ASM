@@ -37,12 +37,38 @@ Start:
 Setup_IOmap  proc near             ;Sets bits in IO map for Tandy, PS/2 and sound card ports
 		push cs
 		pop es
-		mov     IOportMap[042h/8],00000100b  ;Port 42h
-		mov     IOportMap[0C0h/8],11111111b  ;Port 0C0-C07h
-		mov     IOportMap[205h/8],00100000b  ;Port 205h
-		mov	IOportMap[388h/8],00000011b  ;Port 388h / 389h
-		mov	IOportMap[220h/8],01001111b  ;Port 220-223h,226h
-		mov	IOportMap[228h/8],01010100b  ;Port 22Ah,22Ch,22Eh
+
+		push ax
+		push bx
+		push cx
+		push dx
+		push si
+
+		mov bx, StartPort
+.loop:
+		mov ax,bx
+		xor dx,dx
+		mov cx, 8
+		div cx
+
+		add ax, offset IOportMap
+		mov si, ax
+
+		mov al, 1
+		mov cl, dl
+		shl al, cl
+
+		or [si], al
+
+		inc bx
+		cmp bx, EndPort
+		jbe .loop
+
+		pop si
+		pop dx
+		pop cx
+		pop bx
+		pop ax
 		retn
 		endp
 
