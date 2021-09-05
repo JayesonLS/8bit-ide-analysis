@@ -268,3 +268,48 @@ string_to_int_hex:
 	ret
 
 
+; ------------------------------------------------------------------
+; print_int_hex -- Print integer to screen in hex format
+; IN: AX = int
+
+print_int_hex:
+	push dx
+	push cx
+	push ax
+
+	mov cx, 0Fh
+	or ax,ax
+	jz .is_least_significant_digit
+	
+	call print_int_hex
+
+.is_least_significant_digit:
+	mov ax, DX
+	call print_hex_digit
+
+	pop dx
+	pop cx
+	pop ax
+	ret
+
+; ------------------------------------------------------------------
+; print_hex_digit -- Print digit in lower nibble of AL to screen.
+; IN: AL = digit (0-15)
+
+print_hex_digit:
+	push ax
+	push dx
+
+	and al, 0Fh
+	add	al, '0'
+	cmp al, '9'
+	jle .is_number
+	add al, 'F' - '0' + 10;
+.is_number:
+	mov dl,al
+	mov ah,2
+	int 21h
+
+	pop	dx
+	pop ax
+	ret
