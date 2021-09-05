@@ -18,11 +18,7 @@ Start:
 
 		InPort	    	        dw 0    ;Original port
 		OutPort			dw 0    ;Port to redirect access to
-		LPT			db 0    ;use parallel port?
 		FoundOption		db 0
-		int15_old_handler       dw 0    ;Handler for int 15
-		int15_old_handler_seg   dw 0
-		int11_equipment  	dw 0	;Equipment bits returned by int 11h
 
 
 		;Include protected mode routines:
@@ -65,45 +61,6 @@ Delay	     proc near		;Just a small delay (in: AX = delay in ms)
 		retn
 	      endp
 
-
-Write_to_LPT  proc near
-		 pusha
-		 mov 	dx,[ss:OutPort]
-		 out 	dx,al
-
-		 inc     dx             ;Ctrl Port
-		 inc 	dx
-
-		 mov	al,0Ch
-		 out	dx,al
-
-		 dec     dx             ;Status port
-		 mov     cx,18h
-
-		Not_ready:
-
-		 in      al,dx
-		 test	al,01000000b
-		 loopnz  Not_ready
-
-		 cmp     cx,0
-		 je      LPT_done
-
-		 mov     cx,18h
-
-		ready:
-
-		in 	al,dx
-		test	al,01000000b
-		loopz	ready
-
-		LPT_done:
-		inc dx
-		mov al,9
-		out dx,al
-		popa
-		retn
-endp
 
 
 

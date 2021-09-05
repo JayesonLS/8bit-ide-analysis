@@ -61,9 +61,6 @@ CheckPort:
 		cmp     [ss:InPort],0C7h
 		jne     @Other
 
-		cmp     [ss:LPT],1
-		je      .doit
-
 		sub     dx,0C0h   ;Füⁿr Matze - !!!
 		add     dx,[ss:OutPort]
 		out     dx,al
@@ -72,52 +69,8 @@ CheckPort:
 
 
 .doit:
-		cmp     [ss:LPT],1   ;Redirect to LPT port?
-		je      .doLPT
-
 		mov 	dx,[ss:OutPort]
 		out     dx,al
-
-		jmp	@@AllRight
-
-
-.doLPT:
-		pusha
-
-		mov 	dx,[ss:OutPort]
-		out 	dx,al
-
-		inc     dx             ;Ctrl Port
-		inc 	dx
-
-		mov	al,0Ch
-		out     dx,al
-
-		dec     dx             ;Status port
-		mov     cx,18h
-
-		Wait_not_ready:
-
-		in      al,dx
-		test	al,01000000b
-		loopnz    Wait_not_ready
-
-		cmp     cx,0
-		je      LPT_timed_out
-
-		mov     cx,18h
-
-		Wait_ready:
-		in 	al,dx
-		test	al,01000000b
-		loopz	Wait_ready
-
-		LPT_timed_out:
-		inc     dx
-		mov     al,9
-		out     dx,al
-
-		popa
 
 		jmp	@@AllRight
 
