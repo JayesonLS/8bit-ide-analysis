@@ -40,7 +40,7 @@ CheckPort:
 		iretd
 
 @TandyPort:
-		cmp	[ss:InPort],0   ;No redirecting?
+		cmp	[ss:StartPort],0   ;No redirecting?
 		je	@Other
 		cmp	[ss:OutPort],0
 		je	@Other
@@ -53,12 +53,12 @@ CheckPort:
 		jmp     @Other
 
 		.CheckC0:
-		cmp     [ss:InPort],205h
+		cmp     [ss:StartPort],205h
 		je      @Other
 		jmp     .doit
 
 		.CheckC0C7:
-		cmp     [ss:InPort],0C7h
+		cmp     [ss:StartPort],0C7h
 		jne     @Other
 
 		sub     dx,0C0h   ;Füⁿr Matze - !!!
@@ -77,7 +77,7 @@ CheckPort:
 
 
 @PS1:           
-		cmp     [ss:InPort],205h
+		cmp     [ss:StartPort],205h
 		je      .doit
 		jmp     @Other
 

@@ -16,7 +16,7 @@ Start:
 
 		;Variables for Port values:
 
-		InPort		dw 0    ; Start of port range to log
+		StartPort		dw 0    ; Start of port range to log
 		EndPort			dw 0	; End of port range to log
 		OutPort			dw 0    ; Port to redirect access to
 	
@@ -89,7 +89,7 @@ Check_Options:
 		; Parse start port
 		call string_to_int_hex
 		jnc NoValidCmd
-		mov	InPort, ax
+		mov	StartPort, ax
 
 		; Parse end port
 		mov ax,bx
@@ -97,7 +97,7 @@ Check_Options:
 		jnc NoValidCmd
 		mov	EndPort, ax
 
-		cmp ax, InPort
+		cmp ax, StartPort
 		jb NoValidCmd
 
 Start_V86:
@@ -112,7 +112,7 @@ Start_V86:
 
 		mov		si,offset LoggingMsg
 		call    write_string
-		mov		ax,InPort
+		mov		ax,StartPort
 		call	print_int_hex
 		mov		si, offset Hyphen
 		call    write_string
