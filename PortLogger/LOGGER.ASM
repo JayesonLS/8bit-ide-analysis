@@ -21,7 +21,6 @@ Start:
 		OutPort			dw 0    ; Port to redirect access to
 	
 		;Include protected mode routines:
-
 		include 386pdef.asm          ; Definitions first
 		include 386pdata.asm         ; Then data segment
 		include 386plib.asm          ; PM library
@@ -45,45 +44,7 @@ Setup_IOmap  proc near             ;Sets bits in IO map for Tandy, PS/2 and soun
 		mov	IOportMap[220h/8],01001111b  ;Port 220-223h,226h
 		mov	IOportMap[228h/8],01010100b  ;Port 22Ah,22Ch,22Eh
 		retn
-	       endp
-
-Delay	     proc near		;Just a small delay (in: AX = delay in ms)
-		pusha
-		mov bx,1000
-		mul bx
-		mov cx,dx
-		mov dx,ax
-		xor al,al
-		mov ah,86h
-		int 15h
-		popa
-		retn
-	      endp
-
-
-
-
-
-
-
-Handle_Options	proc near
-		;In: AX = offset of string to test; Out: FoundOption = 1 if found
-		pusha
-
-		clc
-
-		; Check for options here. See original TNDY code for how.
-
-		jmp Options_End
-
-Options_End:
-		popa
-		retn
-endp
-
-
-
-
+		endp
 
 
 Init:
@@ -139,9 +100,7 @@ Check_Options:
 		cmp ax, InPort
 		jb NoValidCmd
 
-		; Print settings.
-
-.StartV86:
+Start_V86:
 		clc
 		call 	CheckCPU
 		call	Setup_IOmap
@@ -165,6 +124,12 @@ Check_Options:
 		mov dx, offset Setup_IOmap   ;Everything that should remain memory resident stands before Setup_IOmap
 		int 27h                      ;TSR
 
+NoValidCmd:
+		mov si,offset BadOption
+		call write_string
+
+		mov ah,4Ch
+		int 21h
 
 		include 386rdata.asm         ; Real-mode data
 		include 386preal.asm         ; Real-mode subroutines
@@ -187,34 +152,13 @@ Check_Options:
 
 		InvalidHex	db 'Invalid hex number specified.',10,13,0
 
-		BadOption       db 10,13,'Specify port addresses to redirect port access: ',10,13
-				db 'LOGGER.COM <Tandy port> <Port of the TNDY> (Option 1) (Option 2)',10,13
-				db 10,13
-				db 'Possible Tandy ports (in Hex): ',10,13
-				db '0C0, C0-C7, 205',10,13
-				db 10,13
-				db 'Example: ',10,13
-				db 'LOGGER.COM 0C0 2C0',10,13
-				db 'All access to port 0C0h will be redirected to port 2C0h.',10,13,0
-
-		SC0             db 'C0',0
-		SC0alt		db '0C0',0
-		SE0		db 'E0',0
-		SE0alt		db '0E0',0
-		SC0C7           db 'C0-C7',0
-		S205            db '205',0
-		S1E0            db '1E0',0
-		S2C0            db '2C0',0
-		S2E0		db '2E0',0
+		BadOption	db 10,13,'Usage: ',10,13
+					db 'LOGGER.COM <start port> <end port>',10,13
+					db 10,13
+					db 'Example: ',10,13
+					db 'LOGGER.COM 320 323',10,13
+					db 'to log access to all ports fron 320h to 323h inclusive.',10,13,0
 
 		CmdLine		db 10 dup(0)
-
-NoValidCmd:
-		mov si,offset BadOption
-		call write_string
-
-		mov ah,4Ch
-		int 21h
-
 
 		end     Start
