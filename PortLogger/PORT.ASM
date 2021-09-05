@@ -7,88 +7,34 @@ PortHandler     proc    near
 		je      InAL_DX
 		cmp     ah,0E4h
 		je      InAL_@@
-		jmp     TooBad
+		jmp     TooBad		; Nothing we can do if we don't recognise the instruction.
 
 OutDX_AL:       push    dx
 
-CheckPort:      
+WritePort:      
 		cbw
 		add     [ebp],ax
 		mov     al,byte ptr [ebp-4]
 
-		cmp     dx,0C7h		;Tandy ports C0h-C7h
-		jbe     @TandyPort
+		cmp		dx, [ss:StartPort]
+		jb		@Other
 
-		cmp     dx,205h         ;PS/1 sound port 205h
-		je      @PS1
+		cmp		dx, [ss:EndPort]
+		ja		@Other
 
+		out		80h, al	; Write to POST port.
 
-
-
+		; TODO: Log write here.
 
 @Other:
 		out     dx,al
 		jmp     @@AllRight
 
-
-@@AllRight:     
-		pop     dx
-		pop     ebp
-		pop     ds
-		pop     ebx
-		pop     eax
-		iretd
-
-@TandyPort:
-		cmp	[ss:StartPort],0   ;No redirecting?
-		je	@Other
-		cmp	[ss:OutPort],0
-		je	@Other
-
-		cmp     dx,0C0h
-		je      .CheckC0
-		cmp     dx,0C0h
-		ja      .CheckC0C7
-
-		jmp     @Other
-
-		.CheckC0:
-		cmp     [ss:StartPort],205h
-		je      @Other
-		jmp     .doit
-
-		.CheckC0C7:
-		cmp     [ss:StartPort],0C7h
-		jne     @Other
-
-		sub     dx,0C0h   ;Füⁿr Matze - !!!
-		add     dx,[ss:OutPort]
-		out     dx,al
-
-		jmp	@@AllRight
-
-
-.doit:
-		mov 	dx,[ss:OutPort]
-		out     dx,al
-
-		jmp	@@AllRight
-
-
-
-@PS1:           
-		cmp     [ss:StartPort],205h
-		je      .doit
-		jmp     @Other
-
-
-
-
 Out@@_AL:       
 		push    dx
 		movzx   dx,byte ptr [ebx]
 		inc     al
-		jmp     CheckPort
+		jmp     WritePort
 
 
 InAL_DX:       
@@ -99,6 +45,17 @@ ReadPort:
 		add     [ebp],ax
 		in      al,dx
 		mov     byte ptr [ebp-4],al
+
+		cmp		dx, [ss:StartPort]
+		jb		@Other
+
+		cmp		dx, [ss:EndPort]
+		ja		@Other
+
+		out		80h, al	; Write to POST port.
+
+		; TODO: Log read here.
+
 		jmp     @@AllRight
 
 InAL_@@:        
@@ -106,6 +63,15 @@ InAL_@@:
 		inc     al
 		movzx   dx,byte ptr [ebx]
 		jmp     ReadPort
+
+
+@@AllRight:     
+		pop     dx
+		pop     ebp
+		pop     ds
+		pop     ebx
+		pop     eax
+		iretd
 
 TooBad:
 
