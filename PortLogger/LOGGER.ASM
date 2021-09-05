@@ -331,14 +331,7 @@ Continue:
 
 		LoggingMsg	db 'Port logging installed.',10,13,0
 
-		NoLPTMsg	db 10,13,'ERROR: Parallel port not found!',10,13,0
-
-		EmuMSG		db 'Int 15h and Int 11h changed to report a',0
-
-		SBMSG		db 'Sound Blaster disabled.',10,13,0
-
-		OPLMSG		db 'FM-Chip disabled.',10,13,0
-
+		InvalidHex	db 'Invalid hex number specified.',10,13,0
 
 		BadOption       db 10,13,'Specify port addresses to redirect port access: ',10,13
 				db 'LOGGER.COM <Tandy port> <Port of the TNDY or TLPT> (Option 1) (Option 2)',10,13
