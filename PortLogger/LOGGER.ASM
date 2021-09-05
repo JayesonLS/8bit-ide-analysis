@@ -625,7 +625,7 @@ Continue:
 		cmp	InPort,0
 		je	.NoRDMsg
 
-		mov	si,offset RedirectMsg
+		mov	si,offset LoggingMsg
 		call    write_string
 
 .NoRDMsg:
@@ -645,15 +645,13 @@ Continue:
 
 
 
-		TitleMsg  	db 'I/O redirector for TNDY and TLPT three voice sound devices',10,13
-				db 'by Jan Knipperts (Dragonsphere/DOSReloaded.de)',10,13
-				db 'Alternative C0-C7 redirection test (v.0.94.2)',10,13,0
+		TitleMsg  	db 'I/O Port Access Logger ',10,13,0
 
 		Return		db 10,13,0
 
 		V86SuccessMsg	db 'V86 mode successfully installed.',10,13,0
 
-		RedirectMsg	db 'Port redirection installed.',10,13,0
+		LoggingMsg	db 'Port logging installed.',10,13,0
 
 		NoLPTMsg	db 10,13,'ERROR: Parallel port not found!',10,13,0
 
@@ -665,7 +663,7 @@ Continue:
 
 
 		BadOption       db 10,13,'Specify port addresses to redirect port access: ',10,13
-				db 'TNDY.COM <Tandy port> <Port of the TNDY or TLPT> (Option 1) (Option 2)',10,13
+				db 'LOGGER.COM <Tandy port> <Port of the TNDY or TLPT> (Option 1) (Option 2)',10,13
 				db 10,13
 				db 'Possible Tandy ports (in Hex): ',10,13
 				db '0C0, C0-C7, 205',10,13
@@ -678,7 +676,7 @@ Continue:
 				db 'TANDY - Changes Int 15h, function 0Ch to report a Tandy 1000TL',10,13
 				db 10,13
 				db 'Example: ',10,13
-				db 'TNDY.COM 0C0 2C0 NOSB PCJR',10,13
+				db 'LOGGER.COM 0C0 2C0 NOSB PCJR',10,13
 				db 'All access to port 0C0h will be redirected to port 2C0h, Sound Blaster output ',10,13
 				db 'will be disabled and the Interrupts 11h, and 15h will report a PCjr system.',10,13,0
 
