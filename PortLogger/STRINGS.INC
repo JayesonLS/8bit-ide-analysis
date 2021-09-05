@@ -19,7 +19,7 @@ string_length:
 	xor cx, cx			; Counter CX = 0
 
 .l_more:
-        xor al,al
+	xor al,al
 	cmp byte [bx], al        	; Zero (end of string) yet?
 	je .l_done
 	inc bx				; If not, keep adding
@@ -46,18 +46,18 @@ string_uppercase:
 	mov si, ax			; Use SI to access string
 
 .u_more:
-        mov al,0
+	mov al,0
 	cmp byte [si], al		; Zero-termination of string?
 	je .done			; If so, quit
 
-        mov al,'a'
+	mov al,'a'
 	cmp byte [si], al		; In the lower case A to Z range?
 	jb .noatoz
-        mov al,'z'
+	mov al,'z'
 	cmp byte [si], al
 	ja .noatoz
 
-        mov al,20h
+	mov al,20h
 	sub byte [si], al		; If so, convert input char to upper case
 
 	inc si
@@ -103,7 +103,7 @@ string_parse:
 	cmp al, ' '			; A space?
 	jne .loop1
 	sub si,2
-        mov al,0
+	mov al,0
 	mov byte [si],al		; If so, zero-terminate this bit of the string
 
 	add si,2  			; Store start of next string in BX
@@ -116,7 +116,7 @@ string_parse:
 	cmp al, ' '
 	jne .loop2
 	sub si,2
-        mov al,0
+	mov al,0
 	mov byte [si], al
 
 	add si,2
@@ -129,7 +129,7 @@ string_parse:
 	cmp al,' '
 	jne .loop3
 	sub si,2
-        mov al,0
+	mov al,0
 	mov byte [si], al
 	add si,2
 	mov dx, si
