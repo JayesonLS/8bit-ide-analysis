@@ -107,66 +107,6 @@ endp
 
 
 
-Mute_Tandy  proc near			;Inits chip and Mutes output of SN76496N
-		 mov dx,cs:InPort
-
-		 cmp LPT,1
-		 jne .mute_tndy
-
-		 ;Mute TNDLPT
-
-		 mov al,09Fh
-		 call Write_to_LPT
-		 mov al,0BFh
-		 call Write_to_LPT
-		 mov al,0DFh
-		 call Write_to_LPT
-		 mov al,0FFh
-		 call Write_to_LPT
-		 jmp .End_mute
-
-
-
-
-.mute_tndy:
-		 mov al,1		        ;Init sound chip
-		 out dx,al
-
-		 mov ax,100
-		 call Delay
-
-		 mov al,9
-		 out dx,al
-
-		 mov ax,100
-		 call Delay
-
-		 mov al,09Fh			 ;Mute output of all channels
-		 out dx,al
-
-		 mov ax,100
-		 call Delay
-
-		 mov al,0BFh
-		 out dx,al
-
-		 mov ax,100
-		 call Delay
-
-		 mov al,0DFh
-		 out dx,al
-
-		 mov ax,100
-		 call Delay
-
-		 mov al,0FFh
-		 out dx,al
-
-		 mov ax,100
-		 call Delay
-.end_mute:
-		 retn
-endp
 
 
 
@@ -359,7 +299,6 @@ Continue:
 		call    SwitchToPM
 		call    SwitchToVM86
 
-		call    Mute_Tandy
 		mov 	si,offset V86SuccessMsg
 		call    write_string
 
@@ -383,10 +322,6 @@ Continue:
 
 
 ;Data:
-
-
-
-
 
 		TitleMsg  	db 'I/O Port Access Logger ',10,13,0
 
@@ -415,10 +350,7 @@ Continue:
 				db 10,13
 				db 'Example: ',10,13
 				db 'LOGGER.COM 0C0 2C0',10,13
-				db 'All access to port 0C0h will be redirected to port 2C0h, Sound Blaster output ',10,13
-				db 'will be disabled and the Interrupts 11h, and 15h will report a PCjr system.',10,13,0
-
-		Tandy_str	db 'Tandy 1000TL',0
+				db 'All access to port 0C0h will be redirected to port 2C0h.',10,13,0
 
 		SC0             db 'C0',0
 		SC0alt		db '0C0',0
@@ -429,17 +361,8 @@ Continue:
 		S1E0            db '1E0',0
 		S2C0            db '2C0',0
 		S2E0		db '2E0',0
-		SLPT1           db 'LPT1',0
-		SLPT2           db 'LPT2',0
-		SLPT3		db 'LPT3',0
 
 		CmdLine		db 10 dup(0)
-
-LPT_failed:
-		mov si,offset NoLPTMsg
-		call write_string
-		mov ah,4Ch
-		int 21h
 
 NoValidCmd:
 		mov si,offset BadOption
