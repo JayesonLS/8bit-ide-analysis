@@ -9,7 +9,7 @@ rem
 rem TASM 5 should be installed to dosbox-c-device\TASM
 
 echo Assembling...
-c:\tasm\bin\tasm logger
+c:\tasm\bin\tasm logger logger logger
 if not ERRORLEVEL 0 goto exit
 
 echo Linking...
