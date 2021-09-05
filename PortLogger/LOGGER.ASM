@@ -33,61 +33,6 @@ Start:
 		include 386pint.asm          ; ISR's
 		include 386pdt.asm           ; Descriptor tables
 
-Tandy_Int15_handler:
-	      cmp ah,0C0h         ;Return system configuraton?
-	      je .Tandy_get_rom_table   ;Yes -> Send table
-	      jmp dword ptr cs:int15_old_handler    ;Else jump to old handler
-
-  .Tandy_get_rom_table:
-	      sti
-	      push cs
-	      pop es
-	      mov bx, offset .Tandy_rom_table  ;ES:BX = pointer to descriptor table
-	      xor ah,ah
-	      iret
-
-  .Tandy_rom_table:
-	     dw 8      ;Length of descriptor table (8 minimum)
-	     db 0FFh   ;Tandy 1000TL Model byte
-	     db 001h   ;Tandy 1000TL Sub Model byte
-	     db 000h   ;BIOS revision
-	     db 070h   ;Feature Information
-	     db 000h   ;Reserved
-	     db 000h
-	     db 000h
-	     db 000h
-
-
-PCjr_Int15_handler:
-	      cmp ah,0C0h         ;Return system configuraton?
-	      je .PCjr_get_rom_table   ;Yes -> Send table
-	      jmp dword ptr cs:int15_old_handler    ;Else jump to old handler
-
-  .PCjr_get_rom_table:
-	      sti
-	      push cs
-	      pop es
-	      mov bx, offset .PCjr_rom_table  ;ES:BX = pointer to descriptor table
-	      xor ah,ah
-	      iret
-
-  .PCjr_rom_table:
-	     dw 8      ;Length of descriptor table (8 minimum)
-	     db 0FDh   ;PCjr Model byte
-	     db 000h   ;Sub Model byte
-	     db 000h   ;BIOS revision
-	     db 070h   ;Feature Information
-	     db 000h   ;Reserved
-	     db 000h
-	     db 000h
-	     db 000h
-
-
-Int11_handler:
-	    xor ax,ax
-	    mov ax,cs:int11_equipment	;Return our equipment bits
-	    iret
-
 
 
 
@@ -372,21 +317,6 @@ Check_Options:
 		call string_compare
 		jc .is0C0
 
-		mov  si,bx
-		mov di,offset SLPT1
-		call string_compare
-		jc .isLPT1
-
-		mov si,bx
-		mov di,offset SLPT2
-		call string_compare
-		jc .isLPT2
-
-		mov si,bx
-		mov di,offset SLPT3
-		call string_compare
-		jc .isLPT3
-
 		jmp .OnlyOne
 
 		.is2E0:
@@ -408,73 +338,6 @@ Check_Options:
 		.is0C0:
 		mov OutPort,0C0h
 		jmp Continue
-
-	.isLPT1:
-		mov ax,0040h
-		mov es,ax
-		mov ax,es:[08h]
-		mov OutPort,ax
-		jmp Init_LPT
-
-	.isLPT2:
-		mov ax,0040h
-		mov es,ax
-		mov ax,es:[0Ah]
-		mov OutPort,ax
-		jmp Init_LPT
-
-	.isLPT3:
-		mov ax,0040h
-		mov es,ax
-		mov ax,es:[0Ch]
-		mov OutPort,ax
-
-
-
-Init_LPT:
-		cmp OutPort,0
-		je LPT_failed
-		mov LPT,1
-
-		mov dx,[OutPort]
-		add dx,2		;ctrl port
-
-		;Test if port is in ECR mode
-
-		xor al,al
-		out dx,al
-
-		add dx,400h             ;ECR port
-		in  al,dx
-		and al,3
-		cmp al,1                ;Is ECR enabled?
-		jne  .No_ECR
-
-		xor al,al               ;if yes, disable it
-		out dx,al
-
-		.No_ECR:
-
-		call Mute_Tandy
-
-		;Send initialization sequence for TNDLPT
-
-		sub dx,400h		;ctrl port again
-
-		mov al,07
-		out dx,al
-
-		mov ax,200
-		call delay
-
-		mov al,09
-		out dx,al
-
-		mov ax,200
-		call delay
-
-
-
 
 Continue:
 		cmp    OutPort,0
