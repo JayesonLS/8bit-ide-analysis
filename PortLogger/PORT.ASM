@@ -39,18 +39,6 @@ CheckPort:      cbw
 		cmp	dx,223h		;..and right data port
 		je      @Adlib
 
-		cmp     dx,226h		;SB DSP control ports
-		je      @SB
-
-		cmp	dx,22Ah
-		je      @SB
-
-		cmp	dx,22Ch
-		je      @SB
-
-		cmp     dx,22Eh
-		je      @SB
-
 
 
 
@@ -160,11 +148,6 @@ CheckPort:      cbw
 		je  @@AllRight	   ;Then do nothing
 		jmp .doit	   ;If not, write to port
 
-@SB:
-		cmp [ss:SBOFF],1
-		je @@AllRight
-		jmp .doit
-
 
 
 
@@ -181,23 +164,10 @@ ReadPort:
 		je		@ReadAdlib
 		cmp		dx,0389h
 		je      @ReadAdlib
-		cmp     dx,226h			;SB cmd port
-		je      @ReadSB
-		cmp     dx,22Eh			;SB data port
-		je      @ReadSB
 		jmp 	.Readit
 
 @ReadAdlib:
 		cmp     [ss:OPLOFF],1
-		jne     .Readit
-		cbw
-		add     [ebp],ax
-		mov	al,0FFh		;return FF (bus float) if disabled
-		mov     byte ptr [ebp-4],al
-		jmp     @@AllRight
-
-@ReadSB:
-		cmp     [ss:SBOFF],1
 		jne     .Readit
 		cbw
 		add     [ebp],ax
