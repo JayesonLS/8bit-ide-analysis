@@ -253,6 +253,7 @@ string_to_int_hex:
 	ja .string_to_int_hex_error	; Overflow
 
 	shl	bx, 4
+	xor ah,ah
 	add bx, ax
 	jmp .string_to_int_hex_next_char
 
@@ -263,6 +264,7 @@ string_to_int_hex:
 	ret
 
 .string_to_int_hex_error:
+	mov ax, 0BADh
     pop bx
 	clc
 	ret
@@ -273,18 +275,20 @@ string_to_int_hex:
 ; IN: AX = int
 
 print_int_hex:
-	push dx
-	push cx
 	push ax
+	push cx
+	push dx
 
-	mov cx, 0Fh
-	or ax,ax
+	xor dx,dx
+	mov cx, 10h
+	div cx
+	or ax, ax
 	jz .is_least_significant_digit
 	
 	call print_int_hex
 
 .is_least_significant_digit:
-	mov ax, DX
+	mov ax, dx
 	call print_hex_digit
 
 	pop dx
@@ -304,8 +308,9 @@ print_hex_digit:
 	add	al, '0'
 	cmp al, '9'
 	jle .is_number
-	add al, 'F' - '0' + 10;
+	add al, 'A' - '0' - 10;
 .is_number:
+
 	mov dl,al
 	mov ah,2
 	int 21h
