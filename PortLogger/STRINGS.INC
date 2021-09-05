@@ -202,3 +202,69 @@ string_compare:
 	popa
 	stc				; Set carry flag
 	ret
+
+; ------------------------------------------------------------------
+; string_to_int_hex -- Parse hex format string
+; IN: SI = string one
+; OUT: carry set if valid, int in AX; carry clear on parse error
+
+string_to_int_hex:
+	push bx
+	xor bx,bx
+
+.string_to_int_hex_next_char:
+	mov al, [si]
+	inc si
+
+	cmp al, 0		; Check for string termination
+	je .string_to_int_hex_done
+
+	cmp al, ' '		; Skip whitespace
+	je .string_to_int_hex_next_char
+
+	cmp al, '0'		; Match digits
+	jb .string_to_int_hex_not_digit
+	cmp al, '9'
+	ja .string_to_int_hex_not_digit
+	sub al,'0'
+	jmp .string_to_int_hex_append
+
+.string_to_int_hex_not_digit:
+	cmp al, 'a'		; Match lower case A-F
+	jb .string_to_int_hex_not_lower
+	cmp al, 'f'
+	ja .string_to_int_hex_not_lower
+	sub al,'a' - 10
+	jmp .string_to_int_hex_append
+
+.string_to_int_hex_not_lower:
+	cmp al, 'A'		; Match lower case A-F
+	jb .string_to_int_hex_not_upper
+	cmp al, 'F'
+	ja .string_to_int_hex_not_upper
+	sub al,'A' - 10
+	jmp .string_to_int_hex_append
+
+.string_to_int_hex_not_upper:
+	jmp .string_to_int_hex_error	; Unhandled character
+
+.string_to_int_hex_append:
+	cmp bx, 0FFFh
+	ja .string_to_int_hex_error	; Overflow
+
+	shl	bx, 4
+	add bx, ax
+	jmp .string_to_int_hex_next_char
+
+.string_to_int_hex_done:
+	mov ax, bx
+	pop bx
+	stc
+	ret
+
+.string_to_int_hex_error:
+    pop bx
+	clc
+	ret
+
+
