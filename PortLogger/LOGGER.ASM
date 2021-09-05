@@ -16,11 +16,10 @@ Start:
 
 		;Variables for Port values:
 
-		InPort	    	        dw 0    ;Original port
-		OutPort			dw 0    ;Port to redirect access to
-		FoundOption		db 0
-
-
+		InPort		dw 0    ; Start of port range to log
+		EndPort			dw 0	; End of port range to log
+		OutPort			dw 0    ; Port to redirect access to
+	
 		;Include protected mode routines:
 
 		include 386pdef.asm          ; Definitions first
@@ -116,138 +115,31 @@ Check_Options:
 		mov si,ax
 		call string_parse      ;Parse different strings
 
-		push ax
+		; AX and BX should have options, CX and DX should not
+		or ax,ax
+		jz NoValidCmd
+		or bx,bx
+		jz NoValidCmd
+		or cx,cx
+		jnz NoValidCmd
+		or dx,dx
+		jnz NoValidCmd
 
-		mov ax,dx               ;Test string in dx for known options
-		call Handle_Options
+		; Parse start port
+		call string_to_int_hex
+		jnc NoValidCmd
+		mov	InPort, ax
 
-		mov ax,cx               ;Test string in cx for known options
-		call Handle_Options
+		; Parse end port
+		mov ax,bx
+		call string_to_int_hex
+		jnc NoValidCmd
+		mov	EndPort, ax
 
-		mov ax,bx               ;Test string in bx for known options
-		call Handle_Options
+		cmp ax, InPort
+		jb NoValidCmd
 
-		pop ax                  ;Test string in ax for known options
-		call Handle_Options
-
-
-		cmp bx,0		; There is only one parameter?
-		je .OnlyOne 		; If so, there is nothing else to do here
-
-
-		clc
-
-		mov si,ax
-		mov di,offset SC0
-		call string_compare
-		jc .isC0
-
-		mov si,ax
-		mov di,offset SC0alt
-		call string_compare
-		jc .isC0
-
-		mov si,ax
-		mov di,offset SC0C7
-		call string_compare
-		jc .isC0C7
-
-		mov si,ax
-		mov di,offset S205
-		call string_compare
-		jc .is205
-
-		jmp .OnlyOne
-
-
-	.isC0:
-		mov InPort,0C0h
-		jmp .DoDestParam
-
-	.isC0C7:
-		mov InPort,0C7h
-		jmp .DoDestParam
-
-	.is205:
-		mov InPort,205h
-		jmp .DoDestParam
-
-.OnlyOne:
-		cmp  FoundOption,1      ;ist the paramter an option?
-		je   Continue           ;Yes, the proceed
-		jmp  NoValidCmd         ;Else command is not valid
-
-.DoDestParam:
-
-		mov si,bx
-		mov di,offset S2E0
-		call string_compare
-		jc .is2E0
-
-		mov si,bx
-		mov di,offset S2C0
-		call string_compare
-		jc .is2C0
-
-		mov si,bx
-		mov di,offset S1E0
-		call string_compare
-		jc .is1E0
-
-		mov si,bx
-		mov di,offset SE0
-		call string_compare
-		jc .is0E0
-
-		mov si,bx
-		mov di,offset SE0alt
-		call string_compare
-		jc .is0E0
-
-		mov si,bx
-		mov di,offset SC0
-		call string_compare
-		jc .is0C0
-
-		mov si,bx
-		mov di,offset SC0alt
-		call string_compare
-		jc .is0C0
-
-		jmp .OnlyOne
-
-		.is2E0:
-		mov OutPort,2E0h
-		jmp Continue
-
-		.is2C0:
-		mov OutPort,2C0h
-		jmp Continue
-
-		.is1E0:
-		mov OutPort,1E0h
-		jmp Continue
-
-		.is0E0:
-		mov OutPort,0E0h
-		jmp Continue
-
-		.is0C0:
-		mov OutPort,0C0h
-		jmp Continue
-
-Continue:
-		cmp    OutPort,0
-		je     .NoRD
-		cmp    InPort,0
-		je     .NoRD
-
-		jmp    .StartV86
-
-.NoRD:
-		cmp     FoundOption,0  ;No valid ports, no valid options -> quit here
-		je	NoValidCmd
-
+		; Print settings.
 
 .StartV86:
 		clc
@@ -259,44 +151,47 @@ Continue:
 		mov 	si,offset V86SuccessMsg
 		call    write_string
 
-		cmp     OutPort,0
-		je	.NoRDMsg
-		cmp	InPort,0
-		je	.NoRDMsg
-
-		mov	si,offset LoggingMsg
+		mov		si,offset LoggingMsg
+		call    write_string
+		mov		ax,InPort
+		call	print_int_hex
+		mov		si, offset Hyphen
+		call    write_string
+		mov		ax,EndPort
+		call	print_int_hex
+		mov		si, offset Return
 		call    write_string
 
-.NoRDMsg:
 		mov dx, offset Setup_IOmap   ;Everything that should remain memory resident stands before Setup_IOmap
 		int 27h                      ;TSR
+
 
 		include 386rdata.asm         ; Real-mode data
 		include 386preal.asm         ; Real-mode subroutines
 		include strings.inc          ; String handling routines
 
 
-
-
 ;Data:
 
 		TitleMsg  	db 'I/O Port Access Logger ',10,13,0
+
+		Space		db ' ',0
+
+		Hyphen		db '-',0
 
 		Return		db 10,13,0
 
 		V86SuccessMsg	db 'V86 mode successfully installed.',10,13,0
 
-		LoggingMsg	db 'Port logging installed.',10,13,0
+		LoggingMsg	db 'Port logging installed for range ',0
 
 		InvalidHex	db 'Invalid hex number specified.',10,13,0
 
 		BadOption       db 10,13,'Specify port addresses to redirect port access: ',10,13
-				db 'LOGGER.COM <Tandy port> <Port of the TNDY or TLPT> (Option 1) (Option 2)',10,13
+				db 'LOGGER.COM <Tandy port> <Port of the TNDY> (Option 1) (Option 2)',10,13
 				db 10,13
 				db 'Possible Tandy ports (in Hex): ',10,13
 				db '0C0, C0-C7, 205',10,13
-				db 'Possible ports for TNDY or TLPT (in Hex): ',10,13
-				db 'C0, E0, 1E0, 2C0, 2E0, LPT1, LPT2, LPT3',10,13,10,13
 				db 10,13
 				db 'Example: ',10,13
 				db 'LOGGER.COM 0C0 2C0',10,13

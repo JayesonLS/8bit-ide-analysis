@@ -157,6 +157,7 @@ write_string:
       cmp al,0
       jne Length_Loop
   sub si,cx
+  dec cx
 
  Write_Loop:
    lodsb
