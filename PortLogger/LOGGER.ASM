@@ -21,7 +21,6 @@ Start:
 		LPT			db 0    ;use parallel port?
 		EmuPCjr			db 0	;Emulate PCjr?
 		Emu			db 0	;Emulate?
-		OPLOFF			db 0    ;Disable Adlib/OPL FM?
 		FoundOption		db 0
 		int15_old_handler       dw 0    ;Handler for int 15
 		int15_old_handler_seg   dw 0
@@ -244,11 +243,6 @@ Handle_Options	proc near
 		call string_compare
 		jc Enable_Tandy
 
-		mov si,ax
-		mov di,offset NOFM
-		call string_compare
-		jc Enable_NOOPL
-
 		jmp Options_End
 
 Enable_PCJR:
@@ -262,10 +256,6 @@ Enable_Tandy:
 		mov EmuPCjr,0
 		mov FoundOption,1
 		jmp Options_End
-
-Enable_NOOPL:
-		mov OPLOFF,1
-		mov FoundOption,1
 
 Options_End:
 		popa
@@ -591,13 +581,6 @@ Continue:
 .SkipEmulation:
 		;No Emulation required
 
-		cmp	OPLOFF,0	;Do we have to disable FM?
-		je	.SkipDisableOPL  ;No OPL disabling
-
-		mov	si,offset OPLMsg
-		call	write_string
-
-.SkipDisableOPL:
 		call    Mute_Tandy
 		mov 	si,offset V86SuccessMsg
 		call    write_string
@@ -652,7 +635,6 @@ Continue:
 				db 'Possible ports for TNDY or TLPT (in Hex): ',10,13
 				db 'C0, E0, 1E0, 2C0, 2E0, LPT1, LPT2, LPT3',10,13,10,13
 				db 'Possible Options (not mandatory):',10,13
-				db 'NOFM  - Disables access to Adlib/FM-chip',10,13
 				db 'PCJR  - Changes Int 15h, function 0Ch to report a PCjr',10,13
 				db 'TANDY - Changes Int 15h, function 0Ch to report a Tandy 1000TL',10,13
 				db 10,13
@@ -677,7 +659,6 @@ Continue:
 		SLPT3		db 'LPT3',0
 		PCJR		db 'PCJR',0
 		TANDY		db 'TANDY',0
-		NOFM		db 'NOFM',0
 
 		CmdLine		db 10 dup(0)
 
@@ -696,8 +677,3 @@ NoValidCmd:
 
 
 		end     Start
-
-
-
-
-

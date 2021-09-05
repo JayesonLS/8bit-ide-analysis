@@ -11,7 +11,8 @@ PortHandler     proc    near
 
 OutDX_AL:       push    dx
 
-CheckPort:      cbw
+CheckPort:      
+		cbw
 		add     [ebp],ax
 		mov     al,byte ptr [ebp-4]
 
@@ -20,24 +21,6 @@ CheckPort:      cbw
 
 		cmp     dx,205h         ;PS/1 sound port 205h
 		je      @PS1
-
-		cmp     dx,388h		;Adlib address port
-		je	@Adlib
-
-		cmp	dx,389h		;Adlib data port
-		je      @Adlib
-
-		cmp	dx,220h		;SB Pro left FM address port
-		je      @Adlib
-
-		cmp	dx,221h		;..and left data port
-		je      @Adlib
-
-		cmp	dx,222h		;SB Pro right FM address port
-		je      @Adlib
-
-		cmp	dx,223h		;..and right data port
-		je      @Adlib
 
 
 
@@ -48,7 +31,8 @@ CheckPort:      cbw
 		jmp     @@AllRight
 
 
-@@AllRight:     pop     dx
+@@AllRight:     
+		pop     dx
 		pop     ebp
 		pop     ds
 		pop     ebx
@@ -139,50 +123,33 @@ CheckPort:      cbw
 
 
 
-@PS1:           cmp     [ss:InPort],205h
+@PS1:           
+		cmp     [ss:InPort],205h
 		je      .doit
 		jmp     @Other
 
-@Adlib:
-		cmp  [ss:OPLOFF],1 ;OPL disabled?
-		je  @@AllRight	   ;Then do nothing
-		jmp .doit	   ;If not, write to port
 
 
 
-
-Out@@_AL:       push    dx
+Out@@_AL:       
+		push    dx
 		movzx   dx,byte ptr [ebx]
 		inc     al
 		jmp     CheckPort
 
 
-InAL_DX:        push    dx
+InAL_DX:       
+		push    dx
 
 ReadPort:
-		cmp     dx,0388h		;Adlib
-		je		@ReadAdlib
-		cmp		dx,0389h
-		je      @ReadAdlib
-		jmp 	.Readit
-
-@ReadAdlib:
-		cmp     [ss:OPLOFF],1
-		jne     .Readit
-		cbw
-		add     [ebp],ax
-		mov	al,0FFh		;return FF (bus float) if disabled
-		mov     byte ptr [ebp-4],al
-		jmp     @@AllRight
-
-.Readit:
 		cbw
 		add     [ebp],ax
 		in      al,dx
 		mov     byte ptr [ebp-4],al
 		jmp     @@AllRight
 
-InAL_@@:        push    dx
+InAL_@@:        
+		push    dx
 		inc     al
 		movzx   dx,byte ptr [ebx]
 		jmp     ReadPort
