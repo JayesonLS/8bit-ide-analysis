@@ -24,7 +24,14 @@ WritePort:
 
 		out		80h, al	; Write to POST port.
 
-		; TODO: Log write here.
+		; TODO: Properly log write here.
+		push ds
+		push ax
+		mov ax, 18h
+		mov ds, ax
+		pop ax
+		mov ds:[0B8000h], al 
+		pop ds
 
 @Other:
 		out     dx,al
@@ -54,7 +61,14 @@ ReadPort:
 
 		out		80h, al	; Write to POST port.
 
-		; TODO: Log read here.
+		; TODO: Properly log read here.
+		push ds
+		push ax
+		mov ax, 18h
+		mov ds, ax
+		pop ax
+		mov ds:[0B8000h], al 
+		pop ds
 
 		jmp     @@AllRight
 

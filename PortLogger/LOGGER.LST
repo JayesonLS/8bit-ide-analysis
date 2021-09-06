@@ -1,0 +1,3129 @@
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 1
+logger.ASM
+
+
+
+      1					 ; TSR to log  port access
+      2
+      3	    0000			 .MODEL	 TINY
+      4					 .386P		 ;We need 386 instructions for the protected mode routines
+      5	    0000			 .CODE
+      6					 SMART
+      7					 ORG	 100h
+      8
+      9
+     10					 ;======================= Code to stay resident	===========================
+     11
+     12		  = port.asm				 PortHandler	 equ	 <port.asm> ;Set port handler to its routine
+     13
+     14	    0100			 Start:
+     15	    0100  E9 2C4A				 jmp	 Init		 ;Skip data
+     16
+     17							 ;Variables for	Port values:
+     18
+     19	    0103  0000					 StartPort		 dw 0	 ; Start of port range to log
+     20	    0105  0000					 EndPort		 dw 0	 ; End of port range to	log
+     21	    0107  0000					 OutPort		 dw 0	 ; Port	to redirect access to
+     22
+     23							 ;Include protected mode routines:
+     24							 include 386pdef.asm	      ;	Definitions first
+1    25					 ;∞±≤€ﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂ€≤±∞
+1    26					 ;∞±≤€		       A i386(R) protected mode	library			   €≤±∞
+1    27					 ;∞±≤€		     (C)opyright 1993 by FRIENDS software		   €≤±∞
+1    28					 ;∞±≤€			   Equates and definitions			   €≤±∞
+1    29					 ;∞±≤€‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹€≤±∞
+1    30
+1    31							 locals	 @@
+1    32
+1    33		  =003F			 TopInt		 equ	 3Fh	   ; Number of interrupt gates in IDT
+1    34		  =0040			 PL0stack	 equ	 64	   ; PL0 stack size
+1    35		  =0001			 VM86stack	 equ	 1	   ; VM86 task stack size
+1    36		  =0010			 ESPstack	 equ	 16	   ; Stack into	which are pushed PL0 ESPs
+1    37					 ;Debug		  equ	  1	    ; Set to 0 to disable debug	dumping
+1    38		  =3000			 StartIOPL	 equ	 3000h	   ; Start I/O priviledge level
+1    39		  =0000			 PMinterrupts	 equ	 0	   ; Set to 0 if in protected mode interrupts
+1    40									   ; are disabled - everything will work faster
+1    41									   ; Note: PM interrupts are non-functional
+1    42									   ; now - must	be debugged & changed hw handler
+1    43
+1    44					 ;*********************** Descriptor flags EQUates ****************************
+1    45		  =008F			 df4GbLimit	 equ	 10001111b ; +6
+1    46		  =0040			 dfUse32	 equ	 01000000b ; +6
+1    47		  =0080			 dfPresent	 equ	 10000000b ; +5
+1    48		  =0060			 dfDPL3		 equ	 01100000b ; +5
+1    49		  =0040			 dfDPL2		 equ	 01000000b ; +5
+1    50		  =0020			 dfDPL1		 equ	 00100000b ; +5
+1    51		  =0000			 dfDPL0		 equ	 00000000b ; +5
+1    52		  =0010			 dfNoSystem	 equ	 00010000b ; +5
+1    53		  =0008			 dfExecutable	 equ	 00001000b ; +5
+1    54		  =0004			 dfExpandDown	 equ	 00000100b ; +5
+1    55		  =0004			 dfConforming	 equ	 00000100b ; +5
+1    56		  =0002			 dfWriteable	 equ	 00000010b ; +5
+1    57		  =0002			 dfReadable	 equ	 00000010b ; +5
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 2
+logger.ASM
+
+
+
+1    58		  =0002			 dfTSSbusy	 equ	 00000010b ; +5
+1    59		  =0001			 dfAccessed	 equ	 00000001b ; +5
+1    60
+1    61		  =000F			 dfTrapGate386	 equ	 00001111b ; +5
+1    62		  =000E			 dfIntGate386	 equ	 00001110b ; +5
+1    63		  =000C			 dfCallGate386	 equ	 00001100b ; +5
+1    64		  =0009			 dfTSS386	 equ	 00001001b ; +5
+1    65		  =0007			 dfTrapGate286	 equ	 00000111b ; +5
+1    66		  =0006			 dfIntGate286	 equ	 00000110b ; +5
+1    67		  =0005			 dfTaskGate386	 equ	 00000101b ; +5
+1    68		  =0004			 dfCallGate286	 equ	 00000100b ; +5
+1    69		  =0002			 dfLDT386	 equ	 00000010b ; +5
+1    70		  =0001			 dfTSS286	 equ	 00000001b ; +5
+1    71
+1    72					 ;************************ Usual flags combination ****************************
+1    73		  =009A			 dfCode		 equ	 dfPresent or dfDPL0 or	dfNoSystem or dfExecutable or dfReadable
+1    74		  =0092			 dfData		 equ	 dfPresent or dfDPL0 or	dfNoSystem or dfWriteable
+1    75		  =0096			 dfStack	 equ	 dfPresent or dfDPL0 or	dfNoSystem or dfExpandDown or dfWriteable
+1    76		  =0082			 dfLDT		 equ	 dfPresent or dfDPL0 or	dfLDT386
+1    77		  =0085			 dfTaskGate	 equ	 dfPresent or dfDPL0 or	dfTaskGate386
+1    78		  =008E			 dfIntGate	 equ	 dfPresent or dfDPL0 or	dfIntGate386
+1    79		  =008C			 dfCallGate	 equ	 dfPresent or dfDPL0 or	dfCallGate386
+1    80		  =0089			 dfTSS		 equ	 dfPresent or dfDPL0 or	dfTSS386
+1    81
+1    82					 ;*********************** 386 Descriptor structure ****************************
+1    83	00000109			 Desc386	 struc
+1    84	00000000  01*(????)		 SegLimit	 dw	 ?	 ; limit bits (0..15)
+1    85	00000002  01*(????)		 Base0to15	 dw	 ?	 ; base	bits (0..15)
+1    86	00000004  01*(??)		 Base16to23	 db	 ?	 ; base	bits (16..23)
+1    87	00000005  01*(??)		 AccessRights	 db	 ?	 ; access rights byte
+1    88	00000006  01*(??)		 Granularity	 db	 ?	 ; granularity & default op. size
+1    89	00000007  01*(??)		 Base24to31	 db	 ?	 ; base	bits (24..31)
+1    90	00000008			 Desc386	 ends
+1    91
+1    92					 ;*********************	LGDT & LIDT operand structure *************************
+1    93	00000109			 DT386		 struc
+1    94	00000000  01*(????)		 TableSize	 dw	 ?
+1    95	00000002  01*(????????)		 TableAddr	 dd	 ?
+1    96	00000006			 DT386		 ends
+1    97
+1    98					 ;************************ Macro to create a GDT entry ************************
+1    99		  =0000			 GDToffset	 =	 0
+1   100
+1   101					 GDTdescr	 macro	 Name,DFlags,Granularity
+1   102					 Name:		 Desc386 <0FFFFh,,,DFlags,Granularity>
+1   103					 @&Name		 =	 GDToffset
+1   104					 GDToffset	 =	 GDToffset+8
+1   105							 endm
+1   106
+1   107					 ;************************ Macro to create a IDT entry ************************
+1   108		  =0000			 IDToffset	 =	 0
+1   109
+1   110					 IDTdescr	 macro	 Name,IntOffs,DFlags
+1   111					 Name:		 Desc386 <small	IntOffs,@gdCode,,DFlags>
+1   112					 @&Name		 =	 IDToffset
+1   113					 IDToffset	 =	 IDToffset+8
+1   114							 endm
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 3
+logger.ASM
+
+
+
+1   115
+1   116					 ;************************ TSS structure definition ***************************
+1   117	00000109			 TSSblk		 struc
+1   118	00000000  01*(????????)		 TSSlink	 dd	 ?
+1   119	00000004  01*(????????)		 TSSespP0	 dd	 ?
+1   120	00000008  01*(????????)		 TSSssP0	 dd	 ?
+1   121	0000000C  01*(????????)		 TSSespP1	 dd	 ?
+1   122	00000010  01*(????????)		 TSSssP1	 dd	 ?
+1   123	00000014  01*(????????)		 TSSespP2	 dd	 ?
+1   124	00000018  01*(????????)		 TSSssP2	 dd	 ?
+1   125	0000001C  01*(????????)		 TSScr3		 dd	 ?
+1   126	00000020  01*(????????)		 TSSeip		 dd	 ?
+1   127	00000024  01*(????????)		 TSSeflags	 dd	 ?
+1   128	00000028  01*(????????)		 TSSeax		 dd	 ?
+1   129	0000002C  01*(????????)		 TSSecx		 dd	 ?
+1   130	00000030  01*(????????)		 TSSedx		 dd	 ?
+1   131	00000034  01*(????????)		 TSSebx		 dd	 ?
+1   132	00000038  01*(????????)		 TSSesp		 dd	 ?
+1   133	0000003C  01*(????????)		 TSSebp		 dd	 ?
+1   134	00000040  01*(????????)		 TSSesi		 dd	 ?
+1   135	00000044  01*(????????)		 TSSedi		 dd	 ?
+1   136	00000048  01*(????????)		 TSSes		 dd	 ?
+1   137	0000004C  01*(????????)		 TSScs		 dd	 ?
+1   138	00000050  01*(????????)		 TSSss		 dd	 ?
+1   139	00000054  01*(????????)		 TSSds		 dd	 ?
+1   140	00000058  01*(????????)		 TSSfs		 dd	 ?
+1   141	0000005C  01*(????????)		 TSSgs		 dd	 ?
+1   142	00000060  01*(????????)		 TSSldt		 dd	 ?
+1   143	00000064  01*(????)				 dw	 ?
+1   144	00000066  01*(????)		 TSSiomap	 dw	 ?
+1   145	00000068			 TSSblk		 ends
+1   146
+1   147					 ;*****************************************************************************
+1   148					 ; Call	interrupt 30h with ES:EBX pointing to a	parameter block
+1   149					 ; with	this structure:
+1   150	00000109			 i30ParmBlock	 struc	       ; +00 flag - if 1 then resave es, ds, fs	& gs
+1   151	00000000  01*(????????)		 i30Flag	 dd	 ?     ; into parameter	block after call
+1   152	00000004  01*(??)		 i30IntNo	 db	 ?     ; +04 int number	(0-255)	  (required)
+1   153	00000005  01*(?? ?? ??)				 db	 ?,?,?
+1   154	00000008  01*(????????)		 i30Eflags	 dd	 ?     ; +08 eflags		  (required)
+1   155	0000000C  01*(????????)		 i30ESP		 dd	 ?     ; +12 vm86 esp		  (required)
+1   156	00000010  01*(????????)		 i30SS		 dd	 ?     ; +16 vm86 ss		  (required)
+1   157	00000014  01*(????????)		 i30ES		 dd	 ?     ; +20 vm86 es
+1   158	00000018  01*(????????)		 i30DS		 dd	 ?     ; +24 vm86 ds
+1   159	0000001C  01*(????????)		 i30FS		 dd	 ?     ; +28 vm86 fs
+1   160	00000020  01*(????????)		 i30GS		 dd	 ?     ; +32 vm86 gs
+1   161	00000024  01*(????????)		 i30EBP		 dd	 ?     ; +36 vm86 ebp  ( to replace that used in call )
+1   162	00000028  01*(????????)		 i30EBX		 dd	 ?     ; +40 vm86 ebx  ( to replace that used in call )
+1   163	0000002C					 ends
+1   164					 ; all other registers will be passed to vm86 routine
+1   165					 ;*****************************************************************************
+1   166
+1   167					 ;*************	Set descriptor begin to	point to a specified address **********
+1   168					 SetAddr	 macro	 Descriptor,NearLabel
+1   169							 xor	 eax,eax
+1   170							 mov	 ax,cs
+1   171							 shl	 eax,4
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 4
+logger.ASM
+
+
+
+1   172							 add	 eax,large offset NearLabel
+1   173							 mov	 Descriptor.Base0to15,ax
+1   174							 shr	 eax,16
+1   175							 mov	 Descriptor.Base16to23,al
+1   176							 endm
+1   177
+1   178					 ;************************* Wait bus to	settle down ***************************
+1   179					 SettleBus	 macro
+1   180							 jmp	 short $+2
+1   181							 endm
+1   182
+    183							 include 386pdata.asm	      ;	Then data segment
+1   184					 ;∞±≤€ﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂ€≤±∞
+1   185					 ;∞±≤€		       A i386(R) protected mode	library			   €≤±∞
+1   186					 ;∞±≤€		     (C)opyright 1993 by FRIENDS software		   €≤±∞
+1   187					 ;∞±≤€			   Supervisor data segment			   €≤±∞
+1   188					 ;∞±≤€‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹€≤±∞
+1   189
+1   190	    0109  03			 Color		 db	 03h			 ;Text color
+1   191	    010A  23A0r			 IntSP		 dw	 offset	PSESP		 ;Pseudo-stack pointer
+1   192	    010C  02			 IntState	 db	 2			 ;Interrupts state
+1   193	    010D  ??			 IntMask1	 db	 ?			 ;Saved	port[21h]
+1   194	    010E  ??			 IntMask2	 db	 ?			 ;Saved	port[A1h]
+1   195	    010F  ????????????????	 SavedIDT	 dq	 ?			 ;Saved	from real mode IDT
+1   196	    0117  ????			 Cursor		 dw	 ?			 ;Cursor address
+1   197	    0119  ????????		 RMESP		 dd	 ?			 ;Saved	from real mode ESP
+1   198	    011D  ????			 RMSS		 dw	 ?			 ;Saved	from real mode SS
+1   199	    011F  ????			 DumpSelc	 dw	 ?			 ;Selector for dump
+1   200	    0121  ????????		 DumpOffs	 dd	 ?			 ;Dump offset
+1   201	    0125  ????			 DumpSize	 dw	 ?			 ;Dump size
+1   202	    0127  ????????		 Temp1		 dd	 ?			 ;Four
+1   203	    012B  ????????		 Temp2		 dd	 ?			 ; temporary
+1   204	    012F  ????????		 Temp3		 dd	 ?			 ;  variables
+1   205	    0133  ????????		 Temp4		 dd	 ?			 ;   for ISRs
+1   206					 ;*************************** Debug dump messages *****************************
+1   207	    0137  54 52	3D 00		 TaskMsg	 db	 'TR=',0
+1   208	    013B  20 49	4E 54 3D 00	 UnexpMsg	 db	 ' INT=',0
+1   209	    0141  53 74	61 63 6B 3A 00	 StackMsg	 db	 'Stack:',0
+1   210	    0148  47 46	44 45 53	 RTable		 db	 'GFDES'
+1   211	    014D  44 49	53 49 42 50 53+	 GTable		 db	 'DISIBPSPBXDXCXAX'
+    212		  50 42	58 44 58 43 58+
+    213		  41 58
+1   214	    015D  4D 65	6D 6F 72 79 20+	 MemMsg		 db	 'Memory dump; Selector=',0
+    215		  64 75	6D 70 3B 20 53+
+    216		  65 6C	65 63 74 6F 72+
+    217		  3D 00
+1   218	    0174  46 41	54 41 4C 3A 20+	 GPFmsg		 db	 'FATAL: General protection fault!',10,13,'Opcode = ',0
+    219		  47 65	6E 65 72 61 6C+
+    220		  20 70	72 6F 74 65 63+
+    221		  74 69	6F 6E 20 66 61+
+    222		  75 6C	74 21 0A 0D 4F+
+    223		  70 63	6F 64 65 20 3D+
+    224		  20 00
+1   225	    01A0  49 6E	74 65 72 72 75+	 IntController	 db	 'Interrupt controller #'
+    226		  70 74	20 63 6F 6E 74+
+    227		  72 6F	6C 6C 65 72 20+
+    228		  23
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 5
+logger.ASM
+
+
+
+1   229	    01B6  31 20	6D 61 73 6B 20+	 IntContNo	 db	 '1 mask = ',0
+    230		  3D 20	00
+1   231
+1   232	    01C0  2C*(??)		 HIntFrame	 i30ParmBlock <>		 ; Local interface structure
+1   233
+1   234	    01EC  06*(??)		 DTload		 DT386	 <>
+1   235	    01F2  66*(??) 0068		 TaskSegment	 TSSblk	 <,,,,,,,,,,,,,,,,,,,,,,,,,,offset IOportMap-offset TaskSegment>
+1   236	    025A  2000*(00)		 IOportMap	 db	 8192 dup (0)
+1   237	    225A  00			 IOmapEnd	 db	 0			 ;End of IOportMap
+1   238											 ;Theoretically	speaking it
+1   239											 ;must be 255, but who cares...
+1   240							 NOWARN	 ALN
+1   241	    225B  90					 align	 4
+1   242							 WARN	 ALN
+1   243					 ; Stack for VM86 task
+1   244	    225C  01*(????????)				 dd	 VM86Stack dup (?)
+1   245	    2260			 VM86SP		 label	 near
+1   246					 ; here	is where vm86 int's stack up pl0 esp's
+1   247	    2260  40*(????????)				 dd	 PL0stack dup (?)
+1   248	    2360			 P0ESP		 label	 near
+1   249	    2360  10*(????????)				 dd	 ESPstack dup (?)
+1   250	    23A0			 PSESP		 label	 near
+1   251
+    252							 include 386plib.asm	      ;	PM library
+1   253					 ;∞±≤€ﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂ€≤±∞
+1   254					 ;∞±≤€		       A i386(R) protected mode	library			   €≤±∞
+1   255					 ;∞±≤€		     (C)opyright 1993 by FRIENDS software		   €≤±∞
+1   256					 ;∞±≤€			  Protected-mode use routines			   €≤±∞
+1   257					 ;∞±≤€‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹€≤±∞
+1   258
+1   259					 ;*****************************************************************************
+1   260					 ;		      Change hardware interrupt	vectors
+1   261					 ; In: BL = Starting int no for	int. controller	#1
+1   262					 ;     BH = Starting int no for	int. controller	#2
+1   263					 ;*****************************************************************************
+1   264	    23A0			 SetPIC		 proc	 near
+1   265	    23A0  B0 11					 mov	 al,011h
+1   266	    23A2  E6 20					 out	 020h,al
+1   267	    23A4  E6 A0					 out	 0A0h,al
+1   268							 SettleBus
+2   269	    23A6  EB 00					 jmp	 short $+2
+1   270	    23A8  8A C3					 mov	 al,bl
+1   271	    23AA  E6 21					 out	 021h,al
+1   272	    23AC  8A C7					 mov	 al,bh
+1   273	    23AE  E6 A1					 out	 0A1h,al
+1   274							 SettleBus
+2   275	    23B0  EB 00					 jmp	 short $+2
+1   276	    23B2  B0 04					 mov	 al,004h
+1   277	    23B4  E6 21					 out	 021h,al
+1   278	    23B6  B0 02					 mov	 al,002h
+1   279	    23B8  E6 A1					 out	 0A1h,al
+1   280							 SettleBus
+2   281	    23BA  EB 00					 jmp	 short $+2
+1   282	    23BC  B0 01					 mov	 al,001h
+1   283	    23BE  E6 21					 out	 021h,al
+1   284	    23C0  E6 A1					 out	 0A1h,al
+1   285							 SettleBus
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 6
+logger.ASM
+
+
+
+2   286	    23C2  EB 00					 jmp	 short $+2
+1   287	    23C4  B0 FF					 mov	 al,0FFh
+1   288	    23C6  E6 21					 out	 021h,al
+1   289	    23C8  E6 A1					 out	 0A1h,al
+1   290	    23CA  C3					 ret
+1   291	    23CB			 SetPIC		 endp
+1   292
+1   293					 ;*****************************************************************************
+1   294					 ;			      Restore real mode
+1   295					 ;*****************************************************************************
+1   296	    23CB			 Back2DOS	 proc	 near
+1   297	    23CB  8A D8					 mov	 bl,al
+1   298	    23CD  FA					 cli
+1   299	    23CE  B8 0010				 mov	 ax,@gdData
+1   300	    23D1  8E D8					 mov	 ds,ax
+1   301	    23D3  8E C0					 mov	 es,ax
+1   302	    23D5  8E E0					 mov	 fs,ax			 ;Clear	segment
+1   303	    23D7  8E E8					 mov	 gs,ax			 ;registers cache
+1   304	    23D9  66| 33 C0				 xor	 eax,eax
+1   305	    23DC  0F 23	F8				 mov	 dr7,eax		 ;Turn off debug
+1   306	    23DF  0F 20	C0				 mov	 eax,cr0
+1   307	    23E2  66| 25 7FFFFFF2			 and	 eax,7FFFFFF2h		 ;Turn off paging,PM etc.
+1   308	    23E8  0F 22	C0				 mov	 cr0,eax		 ;Back to real mode
+1   309	    23EB  EA					 db	 0EAh			 ;Clear	prefetch & set CS
+1   310	    23EC  23F0r	1234				 dw	 $+4,1234h
+1   311		  =DGROUP:23EE		 PatchCS1	 equ	 word ptr $-2
+1   312	    23F0  8C C8					 mov	 ax,cs			 ;Set segment
+1   313	    23F2  8E D8					 mov	 ds,ax			 ;registers to CS
+1   314	    23F4  8E C0					 mov	 es,ax
+1   315	    23F6  8E E8					 mov	 gs,ax
+1   316	    23F8  8E E0					 mov	 fs,ax
+1   317	    23FA  66| 0F B2 26 0119r			 lss	 esp,fword ptr RMESP
+1   318	    2400  0F 01	1E 010Fr			 lidt	 SavedIDT
+1   319	    2405  BB 7008				 mov	 bx,7008h
+1   320	    2408  E8 FF95				 call	 SetPIC
+1   321	    240B  B0 36					 mov	 al,36h			 ;Restore IRQ0 frequence
+1   322	    240D  E6 43					 out	 43h,al
+1   323							 SettleBus
+2   324	    240F  EB 00					 jmp	 short $+2
+1   325	    2411  B0 00					 mov	 al,0
+1   326	    2413  E6 40					 out	 40h,al
+1   327							 SettleBus
+2   328	    2415  EB 00					 jmp	 short $+2
+1   329	    2417  E6 40					 out	 40h,al
+1   330							 SettleBus
+2   331	    2419  EB 00					 jmp	 short $+2
+1   332	    241B  FB					 sti
+1   333	    241C  2E: A0 010Dr				 mov	 al,cs:IntMask1
+1   334	    2420  E6 21					 out	 021h,al
+1   335	    2422  2E: A0 010Er				 mov	 al,cs:IntMask2
+1   336	    2426  E6 A1					 out	 0A1h,al
+1   337	    2428  8A C3					 mov	 al,bl
+1   338	    242A  B4 4C					 mov	 ah,04Ch
+1   339	    242C  CD 21					 int	 21h
+1   340	    242E					 endp
+1   341
+1   342	    242E			 Output		 proc	 near
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 7
+logger.ASM
+
+
+
+1   343					 ;*****************************************************************************
+1   344					 ;		      Character	and digit output routines
+1   345					 ;*************************** Print longword in	eax ***************************
+1   346	    242E			 HexOut4	 label	 near
+1   347	    242E  66| 50				 push	 eax
+1   348	    2430  66| C1 E8 10				 shr	 eax,16
+1   349	    2434  E8 0002				 call	 HexOut2
+1   350	    2437  66| 58				 pop	 eax
+1   351					 ;*****************************	Print word in ax ******************************
+1   352	    2439			 HexOut2	 label	 near
+1   353	    2439  50					 push	 ax
+1   354	    243A  8A C4					 mov	 al,ah
+1   355	    243C  E8 0001				 call	 HexOut
+1   356	    243F  58					 pop	 ax
+1   357					 ; print a hex byte in al
+1   358	    2440			 HexOut		 label	 near
+1   359	    2440  D4 10					 aam	 16
+1   360	    2442  05 3030				 add	 ax,'00'
+1   361	    2445  50					 push	 ax
+1   362	    2446  8A C4					 mov	 al,ah
+1   363	    2448  E8 0001				 call	 HexDig
+1   364	    244B  58					 pop	 ax
+1   365	    244C  3C 39			 HexDig:	 cmp	 al,'9'
+1   366	    244E  76 04	90 90				 jbe	 OutChar
+1   367	    2452  04 07					 add	 al,'A'-'0'-10
+1   368	    2454			 OutChar	 label	 near
+1   369	    2454  57					 push	 di
+1   370	    2455  50					 push	 ax
+1   371	    2456  1E					 push	 ds
+1   372	    2457  06					 push	 es
+1   373	    2458  51					 push	 cx
+1   374	    2459  B9 0020 90				 mov	 cx,@gdVideo
+1   375	    245D  8E C1					 mov	 es,cx
+1   376	    245F  B9 0010 90				 mov	 cx,@gdData
+1   377	    2463  8E D9					 mov	 ds,cx
+1   378	    2465  59					 pop	 cx
+1   379	    2466  8A 26	0109r				 mov	 ah,Color
+1   380	    246A  8B 3E	0117r				 mov	 di,Cursor
+1   381	    246E  3C 0D					 cmp	 al,0Dh
+1   382	    2470  74 13	90 90				 je	 CR
+1   383	    2474  3C 0A					 cmp	 al,0Ah
+1   384	    2476  74 1F	90 90				 je	 LF
+1   385					 ; write to screen
+1   386	    247A  D1 E7					 shl	 di,1
+1   387	    247C  26: 89 05				 mov	 es:[di],AX
+1   388	    247F  D1 EF					 shr	 di,1
+1   389	    2481  47					 inc	 di
+1   390	    2482  EB 16	90				 jmp	 OuChD
+1   391	    2485  52			 CR:		 push	 dx
+1   392	    2486  51					 push	 cx
+1   393	    2487  8B C7					 mov	 ax,di
+1   394	    2489  33 D2					 xor	 dx,dx
+1   395	    248B  B9 0050				 mov	 cx,80
+1   396	    248E  F7 F1					 div	 cx
+1   397	    2490  2B FA					 sub	 di,dx
+1   398	    2492  59					 pop	 cx
+1   399	    2493  5A					 pop	 dx
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 8
+logger.ASM
+
+
+
+1   400	    2494  EB 04	90				 jmp	 OuChD
+1   401	    2497  83 C7	50		 LF:		 add	 di,80
+1   402	    249A  81 FF	07D0		 OuChD:		 cmp	 di,80*25		 ; rolling off the screen?
+1   403	    249E  72 28	90 90				 jb	 NoScroll
+1   404					 ; scroll screen if required
+1   405	    24A2  1E					 push	 ds
+1   406	    24A3  06					 push	 es
+1   407	    24A4  1F					 pop	 ds
+1   408	    24A5  56					 push	 si
+1   409	    24A6  51					 push	 cx
+1   410	    24A7  57					 push	 di
+1   411	    24A8  FC					 cld
+1   412	    24A9  B9 0780				 mov	 cx,80*24
+1   413	    24AC  33 FF					 xor	 di,di
+1   414	    24AE  BE 00A0				 mov	 si,160
+1   415	    24B1  F3> A5				 rep	 movsw
+1   416	    24B3  50					 push	 ax
+1   417	    24B4  B0 20					 mov	 al,' '
+1   418	    24B6  2E: 8A 26 0109r			 mov	 ah,cs:Color
+1   419	    24BB  B9 0050				 mov	 cx,80
+1   420	    24BE  F3> AB				 rep	 stosw
+1   421	    24C0  58					 pop	 ax
+1   422	    24C1  5F					 pop	 di
+1   423	    24C2  83 EF	50				 sub	 di,80
+1   424	    24C5  59					 pop	 cx
+1   425	    24C6  5E					 pop	 si
+1   426	    24C7  1F					 pop	 ds
+1   427	    24C8  89 3E	0117r		 NoScroll:	 mov	 Cursor,di		 ; update cursor
+1   428	    24CC  52					 push	 dx
+1   429	    24CD  BA 0018 90				 mov	 dx,@gdFlat
+1   430	    24D1  8E DA					 mov	 ds,dx
+1   431	    24D3  8B 16	0463				 mov	 dx,word ptr ds:[463h]
+1   432	    24D7  8B C7					 mov	 ax,di
+1   433	    24D9  B0 0E					 mov	 al,14
+1   434	    24DB  EF					 out	 dx,ax
+1   435	    24DC  8B C7					 mov	 ax,di
+1   436	    24DE  8A E0					 mov	 ah,al
+1   437	    24E0  B0 0F					 mov	 al,15
+1   438	    24E2  EF					 out	 dx,ax
+1   439
+1   440	    24E3  8B C7					 mov	 ax,di
+1   441	    24E5  BF 0050				 mov	 di,80
+1   442	    24E8  33 D2					 xor	 dx,dx
+1   443	    24EA  F7 F7					 div	 di
+1   444	    24EC  88 16	0450				 mov	 byte ptr ds:[450h],dl
+1   445	    24F0  A2 0451				 mov	 byte ptr ds:[451h],al
+1   446
+1   447	    24F3  5A					 pop	 dx
+1   448	    24F4  07					 pop	 es
+1   449	    24F5  1F					 pop	 ds
+1   450	    24F6  58					 pop	 ax
+1   451	    24F7  5F					 pop	 di
+1   452	    24F8  C3					 ret
+1   453	    24F9					 endp
+1   454
+1   455	    24F9			 CRLF		 proc	 near
+1   456	    24F9  B0 0D					 mov	 al,13
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 9
+logger.ASM
+
+
+
+1   457	    24FB  E8 FF56				 call	 OutChar
+1   458	    24FE  B0 0A					 mov	 al,10
+1   459	    2500  E9 FF51				 jmp	 OutChar
+1   460	    2503					 endp
+1   461
+1   462	    2503			 WriteMSG	 proc	 near
+1   463	    2503  8A 07					 mov	 al,[bx]
+1   464	    2505  0A C0					 or	 al,al
+1   465	    2507  74 08	90 90				 je	 @@WM_End
+1   466	    250B  E8 FF46				 call	 OutChar
+1   467	    250E  43					 inc	 bx
+1   468	    250F  EB F2					 jmp	 WriteMsg
+1   469	    2511  C3			 @@WM_End:	 ret
+1   470	    2512					 endp
+1   471
+    472							 include 386pint.asm	      ;	ISR's
+1   473					 ;∞±≤€ﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂ€≤±∞
+1   474					 ;∞±≤€		       A i386(R) protected mode	library			   €≤±∞
+1   475					 ;∞±≤€		     (C)opyright 1993 by FRIENDS software		   €≤±∞
+1   476					 ;∞±≤€			      Interrupt	handlers			   €≤±∞
+1   477					 ;∞±≤€‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹€≤±∞
+1   478
+1   479					 ; Note	- We don't emulate lock, IRETD,	PUSHFD,	POPFD yet
+1   480
+1   481		  =0080			 BreakpointID	 =	 80h
+1   482					 Break		 macro				 ; Macro works as breakpoint
+1   483							 push	 BreakpointID
+1   484					 BreakpointID	 =	 BreakpointID+1
+1   485							 jmp	 NotIO
+1   486							 endm
+1   487
+1   488					 ;*********************	Interrupt gates	points here ***************************
+1   489					 DefInt		 macro	 N
+1   490					 Int&N		 label	 near
+1   491							 push	 &N
+1   492							 jmp	 IntDump
+1   493							 endm
+1   494
+1   495					 ;*****************************************************************************
+1   496					 ; This	code defines interrupt handlers	from 0 to TOPINT
+1   497					 ; (TOPINT is defined in 386pDef.asm)
+1   498		  =0000			 IntNo		 =	 0
+1   499							 rept	 TopInt+1
+1   500							 DefInt	 %IntNo
+1   501					 IntNo		 =	 IntNo + 1
+1   502							 endm
+2   503							 DefInt	 %IntNo
+3   504	    2512			 Int0		 label	 near
+3   505	    2512  6A 00					 push	 0
+3   506	    2514  E9 013B				 jmp	 IntDump
+2   507							 DefInt	 %IntNo
+3   508	    2517			 Int1		 label	 near
+3   509	    2517  6A 01					 push	 1
+3   510	    2519  E9 0136				 jmp	 IntDump
+2   511							 DefInt	 %IntNo
+3   512	    251C			 Int2		 label	 near
+3   513	    251C  6A 02					 push	 2
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 10
+logger.ASM
+
+
+
+3   514	    251E  E9 0131				 jmp	 IntDump
+2   515							 DefInt	 %IntNo
+3   516	    2521			 Int3		 label	 near
+3   517	    2521  6A 03					 push	 3
+3   518	    2523  E9 012C				 jmp	 IntDump
+2   519							 DefInt	 %IntNo
+3   520	    2526			 Int4		 label	 near
+3   521	    2526  6A 04					 push	 4
+3   522	    2528  E9 0127				 jmp	 IntDump
+2   523							 DefInt	 %IntNo
+3   524	    252B			 Int5		 label	 near
+3   525	    252B  6A 05					 push	 5
+3   526	    252D  E9 0122				 jmp	 IntDump
+2   527							 DefInt	 %IntNo
+3   528	    2530			 Int6		 label	 near
+3   529	    2530  6A 06					 push	 6
+3   530	    2532  E9 011D				 jmp	 IntDump
+2   531							 DefInt	 %IntNo
+3   532	    2535			 Int7		 label	 near
+3   533	    2535  6A 07					 push	 7
+3   534	    2537  E9 0118				 jmp	 IntDump
+2   535							 DefInt	 %IntNo
+3   536	    253A			 Int8		 label	 near
+3   537	    253A  6A 08					 push	 8
+3   538	    253C  E9 0113				 jmp	 IntDump
+2   539							 DefInt	 %IntNo
+3   540	    253F			 Int9		 label	 near
+3   541	    253F  6A 09					 push	 9
+3   542	    2541  E9 010E				 jmp	 IntDump
+2   543							 DefInt	 %IntNo
+3   544	    2544			 Int10		 label	 near
+3   545	    2544  6A 0A					 push	 10
+3   546	    2546  E9 0109				 jmp	 IntDump
+2   547							 DefInt	 %IntNo
+3   548	    2549			 Int11		 label	 near
+3   549	    2549  6A 0B					 push	 11
+3   550	    254B  E9 0104				 jmp	 IntDump
+2   551							 DefInt	 %IntNo
+3   552	    254E			 Int12		 label	 near
+3   553	    254E  6A 0C					 push	 12
+3   554	    2550  E9 00FF				 jmp	 IntDump
+2   555							 DefInt	 %IntNo
+3   556	    2553			 Int13		 label	 near
+3   557	    2553  6A 0D					 push	 13
+3   558	    2555  E9 00FA				 jmp	 IntDump
+2   559							 DefInt	 %IntNo
+3   560	    2558			 Int14		 label	 near
+3   561	    2558  6A 0E					 push	 14
+3   562	    255A  E9 00F5				 jmp	 IntDump
+2   563							 DefInt	 %IntNo
+3   564	    255D			 Int15		 label	 near
+3   565	    255D  6A 0F					 push	 15
+3   566	    255F  E9 00F0				 jmp	 IntDump
+2   567							 DefInt	 %IntNo
+3   568	    2562			 Int16		 label	 near
+3   569	    2562  6A 10					 push	 16
+3   570	    2564  E9 00EB				 jmp	 IntDump
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 11
+logger.ASM
+
+
+
+2   571							 DefInt	 %IntNo
+3   572	    2567			 Int17		 label	 near
+3   573	    2567  6A 11					 push	 17
+3   574	    2569  E9 00E6				 jmp	 IntDump
+2   575							 DefInt	 %IntNo
+3   576	    256C			 Int18		 label	 near
+3   577	    256C  6A 12					 push	 18
+3   578	    256E  E9 00E1				 jmp	 IntDump
+2   579							 DefInt	 %IntNo
+3   580	    2571			 Int19		 label	 near
+3   581	    2571  6A 13					 push	 19
+3   582	    2573  E9 00DC				 jmp	 IntDump
+2   583							 DefInt	 %IntNo
+3   584	    2576			 Int20		 label	 near
+3   585	    2576  6A 14					 push	 20
+3   586	    2578  E9 00D7				 jmp	 IntDump
+2   587							 DefInt	 %IntNo
+3   588	    257B			 Int21		 label	 near
+3   589	    257B  6A 15					 push	 21
+3   590	    257D  E9 00D2				 jmp	 IntDump
+2   591							 DefInt	 %IntNo
+3   592	    2580			 Int22		 label	 near
+3   593	    2580  6A 16					 push	 22
+3   594	    2582  E9 00CD				 jmp	 IntDump
+2   595							 DefInt	 %IntNo
+3   596	    2585			 Int23		 label	 near
+3   597	    2585  6A 17					 push	 23
+3   598	    2587  E9 00C8				 jmp	 IntDump
+2   599							 DefInt	 %IntNo
+3   600	    258A			 Int24		 label	 near
+3   601	    258A  6A 18					 push	 24
+3   602	    258C  E9 00C3				 jmp	 IntDump
+2   603							 DefInt	 %IntNo
+3   604	    258F			 Int25		 label	 near
+3   605	    258F  6A 19					 push	 25
+3   606	    2591  E9 00BE				 jmp	 IntDump
+2   607							 DefInt	 %IntNo
+3   608	    2594			 Int26		 label	 near
+3   609	    2594  6A 1A					 push	 26
+3   610	    2596  E9 00B9				 jmp	 IntDump
+2   611							 DefInt	 %IntNo
+3   612	    2599			 Int27		 label	 near
+3   613	    2599  6A 1B					 push	 27
+3   614	    259B  E9 00B4				 jmp	 IntDump
+2   615							 DefInt	 %IntNo
+3   616	    259E			 Int28		 label	 near
+3   617	    259E  6A 1C					 push	 28
+3   618	    25A0  E9 00AF				 jmp	 IntDump
+2   619							 DefInt	 %IntNo
+3   620	    25A3			 Int29		 label	 near
+3   621	    25A3  6A 1D					 push	 29
+3   622	    25A5  E9 00AA				 jmp	 IntDump
+2   623							 DefInt	 %IntNo
+3   624	    25A8			 Int30		 label	 near
+3   625	    25A8  6A 1E					 push	 30
+3   626	    25AA  E9 00A5				 jmp	 IntDump
+2   627							 DefInt	 %IntNo
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 12
+logger.ASM
+
+
+
+3   628	    25AD			 Int31		 label	 near
+3   629	    25AD  6A 1F					 push	 31
+3   630	    25AF  E9 00A0				 jmp	 IntDump
+2   631							 DefInt	 %IntNo
+3   632	    25B2			 Int32		 label	 near
+3   633	    25B2  6A 20					 push	 32
+3   634	    25B4  E9 009B				 jmp	 IntDump
+2   635							 DefInt	 %IntNo
+3   636	    25B7			 Int33		 label	 near
+3   637	    25B7  6A 21					 push	 33
+3   638	    25B9  E9 0096				 jmp	 IntDump
+2   639							 DefInt	 %IntNo
+3   640	    25BC			 Int34		 label	 near
+3   641	    25BC  6A 22					 push	 34
+3   642	    25BE  E9 0091				 jmp	 IntDump
+2   643							 DefInt	 %IntNo
+3   644	    25C1			 Int35		 label	 near
+3   645	    25C1  6A 23					 push	 35
+3   646	    25C3  E9 008C				 jmp	 IntDump
+2   647							 DefInt	 %IntNo
+3   648	    25C6			 Int36		 label	 near
+3   649	    25C6  6A 24					 push	 36
+3   650	    25C8  E9 0087				 jmp	 IntDump
+2   651							 DefInt	 %IntNo
+3   652	    25CB			 Int37		 label	 near
+3   653	    25CB  6A 25					 push	 37
+3   654	    25CD  E9 0082				 jmp	 IntDump
+2   655							 DefInt	 %IntNo
+3   656	    25D0			 Int38		 label	 near
+3   657	    25D0  6A 26					 push	 38
+3   658	    25D2  EB 7E	90				 jmp	 IntDump
+2   659							 DefInt	 %IntNo
+3   660	    25D5			 Int39		 label	 near
+3   661	    25D5  6A 27					 push	 39
+3   662	    25D7  EB 79	90				 jmp	 IntDump
+2   663							 DefInt	 %IntNo
+3   664	    25DA			 Int40		 label	 near
+3   665	    25DA  6A 28					 push	 40
+3   666	    25DC  EB 74	90				 jmp	 IntDump
+2   667							 DefInt	 %IntNo
+3   668	    25DF			 Int41		 label	 near
+3   669	    25DF  6A 29					 push	 41
+3   670	    25E1  EB 6F	90				 jmp	 IntDump
+2   671							 DefInt	 %IntNo
+3   672	    25E4			 Int42		 label	 near
+3   673	    25E4  6A 2A					 push	 42
+3   674	    25E6  EB 6A	90				 jmp	 IntDump
+2   675							 DefInt	 %IntNo
+3   676	    25E9			 Int43		 label	 near
+3   677	    25E9  6A 2B					 push	 43
+3   678	    25EB  EB 65	90				 jmp	 IntDump
+2   679							 DefInt	 %IntNo
+3   680	    25EE			 Int44		 label	 near
+3   681	    25EE  6A 2C					 push	 44
+3   682	    25F0  EB 60	90				 jmp	 IntDump
+2   683							 DefInt	 %IntNo
+3   684	    25F3			 Int45		 label	 near
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 13
+logger.ASM
+
+
+
+3   685	    25F3  6A 2D					 push	 45
+3   686	    25F5  EB 5B	90				 jmp	 IntDump
+2   687							 DefInt	 %IntNo
+3   688	    25F8			 Int46		 label	 near
+3   689	    25F8  6A 2E					 push	 46
+3   690	    25FA  EB 56	90				 jmp	 IntDump
+2   691							 DefInt	 %IntNo
+3   692	    25FD			 Int47		 label	 near
+3   693	    25FD  6A 2F					 push	 47
+3   694	    25FF  EB 51	90				 jmp	 IntDump
+2   695							 DefInt	 %IntNo
+3   696	    2602			 Int48		 label	 near
+3   697	    2602  6A 30					 push	 48
+3   698	    2604  EB 4C	90				 jmp	 IntDump
+2   699							 DefInt	 %IntNo
+3   700	    2607			 Int49		 label	 near
+3   701	    2607  6A 31					 push	 49
+3   702	    2609  EB 47	90				 jmp	 IntDump
+2   703							 DefInt	 %IntNo
+3   704	    260C			 Int50		 label	 near
+3   705	    260C  6A 32					 push	 50
+3   706	    260E  EB 42	90				 jmp	 IntDump
+2   707							 DefInt	 %IntNo
+3   708	    2611			 Int51		 label	 near
+3   709	    2611  6A 33					 push	 51
+3   710	    2613  EB 3D	90				 jmp	 IntDump
+2   711							 DefInt	 %IntNo
+3   712	    2616			 Int52		 label	 near
+3   713	    2616  6A 34					 push	 52
+3   714	    2618  EB 38	90				 jmp	 IntDump
+2   715							 DefInt	 %IntNo
+3   716	    261B			 Int53		 label	 near
+3   717	    261B  6A 35					 push	 53
+3   718	    261D  EB 33	90				 jmp	 IntDump
+2   719							 DefInt	 %IntNo
+3   720	    2620			 Int54		 label	 near
+3   721	    2620  6A 36					 push	 54
+3   722	    2622  EB 2E	90				 jmp	 IntDump
+2   723							 DefInt	 %IntNo
+3   724	    2625			 Int55		 label	 near
+3   725	    2625  6A 37					 push	 55
+3   726	    2627  EB 29	90				 jmp	 IntDump
+2   727							 DefInt	 %IntNo
+3   728	    262A			 Int56		 label	 near
+3   729	    262A  6A 38					 push	 56
+3   730	    262C  EB 24	90				 jmp	 IntDump
+2   731							 DefInt	 %IntNo
+3   732	    262F			 Int57		 label	 near
+3   733	    262F  6A 39					 push	 57
+3   734	    2631  EB 1F	90				 jmp	 IntDump
+2   735							 DefInt	 %IntNo
+3   736	    2634			 Int58		 label	 near
+3   737	    2634  6A 3A					 push	 58
+3   738	    2636  EB 1A	90				 jmp	 IntDump
+2   739							 DefInt	 %IntNo
+3   740	    2639			 Int59		 label	 near
+3   741	    2639  6A 3B					 push	 59
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 14
+logger.ASM
+
+
+
+3   742	    263B  EB 15	90				 jmp	 IntDump
+2   743							 DefInt	 %IntNo
+3   744	    263E			 Int60		 label	 near
+3   745	    263E  6A 3C					 push	 60
+3   746	    2640  EB 10	90				 jmp	 IntDump
+2   747							 DefInt	 %IntNo
+3   748	    2643			 Int61		 label	 near
+3   749	    2643  6A 3D					 push	 61
+3   750	    2645  EB 0B	90				 jmp	 IntDump
+2   751							 DefInt	 %IntNo
+3   752	    2648			 Int62		 label	 near
+3   753	    2648  6A 3E					 push	 62
+3   754	    264A  EB 06	90				 jmp	 IntDump
+2   755							 DefInt	 %IntNo
+3   756	    264D			 Int63		 label	 near
+3   757	    264D  6A 3F					 push	 63
+3   758	    264F  EB 01	90				 jmp	 IntDump
+1   759
+1   760					 ;**** If we made it here, we have an hardware or an unexpected	interrupt *****
+1   761					 ;**************** so crank out	a debug	dump and exit to dos ******************
+1   762
+1   763	    2652  67| 80 3C 24 06	 IntDump:	 cmp	 byte ptr [esp],6
+1   764	    2657  0F 86	048D				 jbe	 EmulateInt		 ; Emulate INTs	0, 1, 3	...
+1   765	    265B  67| 80 3C 24 20			 cmp	 byte ptr [esp],20h
+1   766	    2660  72 0E	90 90				 jb	 NotIO
+1   767	    2664  67| 80 3C 24 2F			 cmp	 byte ptr [esp],2Fh
+1   768	    2669  77 05	90 90				 ja	 NotIO
+1   769	    266D  E9 03ED				 jmp	 HWint
+1   770	    2670  66| 60		 NotIO:		 pushad
+1   771	    2672  16					 push	 ss
+1   772	    2673  06					 push	 es
+1   773	    2674  1E					 push	 ds
+1   774	    2675  0F A0					 push	 fs
+1   775	    2677  0F A8					 push	 gs
+1   776	    2679  B8 0010				 mov	 ax,@gdData
+1   777	    267C  8E D8					 mov	 ds,ax
+1   778					 ; do dump
+1   779	    267E  E8 FE78				 call	 CRLF
+1   780	    2681  B9 0005				 mov	 cx,5
+1   781	    2684  BB 0148r				 mov	 bx,offset RTable
+1   782	    2687  8A 07			 IntL1:		 mov	 al,[bx]
+1   783	    2689  43					 inc	 bx
+1   784	    268A  E8 FDC7				 call	 OutChar
+1   785	    268D  B0 53					 mov	 al,'S'
+1   786	    268F  E8 FDC2				 call	 OutChar
+1   787	    2692  B0 3D					 mov	 al,'='
+1   788	    2694  E8 FDBD				 call	 OutChar
+1   789	    2697  58					 pop	 ax
+1   790	    2698  E8 FD9E				 call	 HexOut2
+1   791	    269B  51					 push	 cx
+1   792	    269C  B9 0002				 mov	 cx,2
+1   793	    269F  B0 20			 lsp1:		 mov	 al,' '
+1   794	    26A1  E8 FDB0				 call	 OutChar
+1   795	    26A4  E2 F9					 loop	 lsp1
+1   796	    26A6  59					 pop	 cx
+1   797	    26A7  E2 DE					 loop	 IntL1
+1   798	    26A9  33 C9					 xor	 cx,cx
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 15
+logger.ASM
+
+
+
+1   799	    26AB  BB 014Dr				 mov	 bx,offset GTable
+1   800	    26AE  F6 C1	03		 IntL2:		 test	 cl,011b
+1   801	    26B1  75 03					 jnz	 short NoCRint
+1   802	    26B3  E8 FE43				 call	 CRLF
+1   803	    26B6  B0 45			 NoCRint:	 mov	 al,'E'
+1   804	    26B8  E8 FD99				 call	 OutChar
+1   805	    26BB  8A 07					 mov	 al,[bx]
+1   806	    26BD  43					 inc	 bx
+1   807	    26BE  E8 FD93				 call	 OutChar
+1   808	    26C1  8A 07					 mov	 al,[bx]
+1   809	    26C3  43					 inc	 bx
+1   810	    26C4  E8 FD8D				 call	 OutChar
+1   811	    26C7  B0 3D					 mov	 al,'='
+1   812	    26C9  E8 FD88				 call	 OutChar
+1   813	    26CC  66| 58				 pop	 eax
+1   814	    26CE  80 F9	03				 cmp	 cl,3
+1   815	    26D1  75 06	90 90				 jne	 NoESP
+1   816	    26D5  66| 83 C0 02				 add	 eax,2
+1   817	    26D9  E8 FD52		 NoESP:		 call	 HexOut4
+1   818	    26DC  B0 20					 mov	 al,' '
+1   819	    26DE  E8 FD73				 call	 OutChar
+1   820	    26E1  FE C1					 inc	 cl
+1   821	    26E3  80 F9	08				 cmp	 cl,8
+1   822	    26E6  75 C6					 jne	 short IntL2
+1   823	    26E8  E8 FE0E				 call	 CRLF
+1   824	    26EB  BB 0137r				 mov	 bx,offset TaskMsg
+1   825	    26EE  E8 FE12				 call	 WriteMsg
+1   826	    26F1  0F 00	C8				 str	 ax
+1   827	    26F4  E8 FD42				 call	 HexOut2
+1   828	    26F7  BB 013Br				 mov	 bx,offset UnexpMsg
+1   829	    26FA  E8 FE06				 call	 WriteMsg
+1   830	    26FD  58					 pop	 ax
+1   831	    26FE  E8 FD3F				 call	 HexOut
+1   832	    2701  E8 FDF5				 call	 CRLF
+1   833	    2704  36: C6 06 01B6r 31			 mov	 byte ptr ss:IntContNo,'1'
+1   834	    270A  BB 01A0r				 mov	 bx,offset IntController
+1   835	    270D  E8 FDF3				 call	 WriteMsg
+1   836	    2710  E4 21					 in	 al,21h
+1   837	    2712  E8 FD2B				 call	 HexOut
+1   838	    2715  E8 FDE1				 call	 CRLF
+1   839	    2718  36: C6 06 01B6r 32			 mov	 byte ptr ss:IntContNo,'2'
+1   840	    271E  BB 01A0r				 mov	 bx,offset IntController
+1   841	    2721  E8 FDDF				 call	 WriteMsg
+1   842	    2724  E4 A1					 in	 al,0A1h
+1   843	    2726  E8 FD17				 call	 HexOut
+1   844
+1   845					 ; stack dump
+1   846	    2729  BA 235Fr				 mov	 dx,offset P0ESP-1
+1   847	    272C  66| 8B 36 01F6r			 mov	 esi,TaskSegment.TSSespP0
+1   848	    2731  E8 FDC5				 call	 CRLF
+1   849	    2734  BB 0141r				 mov	 bx,offset StackMsg
+1   850	    2737  E8 FDC9				 call	 WriteMsg
+1   851	    273A  B1 0F					 mov	 cl,15
+1   852	    273C  3B E2			 IntL3:		 cmp	 sp,dx
+1   853	    273E  73 2B					 jae	 short IntAbt
+1   854	    2740  80 F9	0E				 cmp	 cl,14
+1   855	    2743  76 05					 jbe	 short NoScr
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 16
+logger.ASM
+
+
+
+1   856	    2745  E8 FDB1				 call	 CRLF
+1   857	    2748  B1 00					 mov	 cl,0
+1   858	    274A  58			 NoScr:		 pop	 ax
+1   859	    274B  8A 1E	0109r				 mov	 bl,Color
+1   860	    274F  66| 3B E6				 cmp	 esp,esi
+1   861	    2752  75 07	90 90				 jne	 NoHighlight		 ; Use for first word in
+1   862	    2756  C6 06	0109r 0F			 mov	 Color,15		 ; stack with white color
+1   863	    275B  E8 FCDB		 NoHighlight:	 call	 HexOut2
+1   864	    275E  88 1E	0109r				 mov	 Color,bl
+1   865	    2762  FE C1					 inc	 cl
+1   866	    2764  B0 20					 mov	 al,' '
+1   867	    2766  E8 FCEB				 call	 OutChar
+1   868	    2769  EB D1					 jmp	 IntL3
+1   869
+1   870					 ; check for memory dump request
+1   871	    276B  E8 FD8B		 IntAbt:	 call	 CRLF
+1   872	    276E  A1 011Fr				 mov	 ax,word ptr DumpSelc
+1   873	    2771  0B C0					 or	 ax,ax
+1   874	    2773  74 77	90 90				 jz	 NoMemDump
+1   875					 ; come	here to	do memory dump
+1   876	    2777  8E C0					 mov	 es,ax
+1   877	    2779  1E					 push	 ds
+1   878	    277A  0E					 push	 cs
+1   879	    277B  1F					 pop	 ds
+1   880	    277C  BB 015Dr				 mov	 bx,offset MemMsg
+1   881	    277F  E8 FD81				 call	 WriteMsg
+1   882	    2782  1F					 pop	 ds
+1   883	    2783  8C C0					 mov	 ax,es
+1   884	    2785  E8 FCB1				 call	 HexOut2
+1   885	    2788  E8 FD6E				 call	 CRLF
+1   886	    278B  66| 8B 36 0121r			 mov	 esi,DumpOffs
+1   887	    2790  8B 0E	0125r				 mov	 cx,DumpSize
+1   888	    2794  83 C1	0F				 add	 cx,15
+1   889	    2797  C1 E9	04				 shr	 cx,4			 ;Number of rows
+1   890
+1   891	    279A  66| 8B C6		 @@D_0:		 mov	 eax,esi
+1   892	    279D  E8 FC8E				 call	 HexOut4
+1   893	    27A0  B0 20					 mov	 al,' '
+1   894	    27A2  E8 FCAF				 call	 OutChar
+1   895	    27A5  B0 B3					 mov	 al,'≥'
+1   896	    27A7  E8 FCAA				 call	 OutChar
+1   897	    27AA  B0 20					 mov	 al,' '
+1   898	    27AC  E8 FCA5				 call	 OutChar
+1   899	    27AF  BA 0010				 mov	 dx,16
+1   900	    27B2  26: 67| 8A 06		 @@D_1:		 mov	 al,es:[esi]
+1   901	    27B6  66| 46				 inc	 esi
+1   902	    27B8  E8 FC85				 call	 HexOut
+1   903	    27BB  B0 20					 mov	 al,' '
+1   904	    27BD  E8 FC94				 call	 OutChar
+1   905	    27C0  4A					 dec	 dx
+1   906	    27C1  75 EF					 jne	 @@D_1
+1   907	    27C3  B2 10					 mov	 dl,16
+1   908	    27C5  66| 83 EE 10				 sub	 esi,16
+1   909	    27C9  B0 B3					 mov	 al,'≥'
+1   910	    27CB  E8 FC86				 call	 OutChar
+1   911	    27CE  B0 20					 mov	 al,' '
+1   912	    27D0  E8 FC81				 call	 OutChar
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 17
+logger.ASM
+
+
+
+1   913	    27D3  26: 67| 8A 06		 @@D_2:		 mov	 al,es:[esi]
+1   914	    27D7  66| 46				 inc	 esi
+1   915	    27D9  3C 20					 cmp	 al,' '
+1   916	    27DB  77 04	90 90				 ja	 @@D_OK
+1   917	    27DF  B0 2E					 mov	 al,'.'
+1   918	    27E1  E8 FC70		 @@D_OK:	 call	 OutChar
+1   919	    27E4  4A					 dec	 dx
+1   920	    27E5  75 EC					 jne	 @@D_2
+1   921	    27E7  E8 FD0F				 call	 CRLF
+1   922	    27EA  E2 AE					 loop	 @@D_0
+1   923	    27EC  E9 FBDC		 NoMemDump:	 jmp	 Back2DOS
+1   924
+1   925					 ;*****************************************************************************
+1   926					 ;			 Here we check the GP fault
+1   927					 ;   If	the mode isn't vm86 we do a debug dump;	otherwise we try and emulate
+1   928					 ;	an instruction;	if the instruction isn't known,	we do a	debug dump
+1   929					 ;*****************************************************************************
+1   930	    27EF			 Int13h:
+1   931	    27EF  66| 67| 89 04	24			 mov	 [esp],eax		 ; remove error	code & push eax
+1   932	    27F4  66| 53				 push	 ebx
+1   933	    27F6  1E					 push	 ds
+1   934	    27F7  66| 55				 push	 ebp
+1   935	    27F9  66| 8B EC				 mov	 ebp,esp		 ; point to stack frame
+1   936	    27FC  66| 83 C5 0E				 add	 ebp,14
+1   937	    2800  B8 0018				 mov	 ax,@gdFlat
+1   938	    2803  8E D8					 mov	 ds,ax
+1   939	    2805  66| 67| 0F B7	5D 04			 movzx	 ebx,word ptr [ebp+4]	 ; get CS
+1   940	    280B  66| C1 E3 04				 shl	 ebx,4
+1   941	    280F  66| 67| 03 5D	00			 add	 ebx,[ebp]		 ; get EIP
+1   942	    2814  66| 33 C0				 xor	 eax,eax
+1   943	    2817  EB 07	90				 jmp	 InLoop
+1   944
+1   945					 ; al =	opcode byte
+1   946					 ; ah =	# of bytes skipped over
+1   947					 ; bit 31 of eax=1 if 'opsize' prefix encountered
+1   948	    281A  66| 0D 80000000	 FSet:		 or	 eax,80000000h
+1   949	    2820  67| 8A 23		 InLoop:	 mov	 ah,[ebx]
+1   950	    2823  FE C0					 inc	 al
+1   951	    2825  66| 43				 inc	 ebx
+1   952	    2827  80 FC	66				 cmp	 ah,66h	      ;	opsize prefix
+1   953	    282A  74 EE					 je	 FSet
+1   954
+1   955
+1   956					 %		 Include PortHandler
+3   957	    282C			 PortHandler	 proc	 near
+3   958	    282C  80 FC	EE				 cmp	 ah,0EEh
+3   959	    282F  74 1A	90 90				 je	 OutDX_AL
+3   960	    2833  80 FC	E6				 cmp	 ah,0E6h
+3   961	    2836  74 44	90 90				 je	 Out@@_AL
+3   962	    283A  80 FC	EC				 cmp	 ah,0ECh
+3   963	    283D  74 46	90 90				 je	 InAL_DX
+3   964	    2841  80 FC	E4				 cmp	 ah,0E4h
+3   965	    2844  74 6C	90 90				 je	 InAL_@@
+3   966	    2848  EB 7B	90				 jmp	 TooBad		 ; Nothing we can do if	we don't recognise the	    +
+    967					 instruction.
+3   968
+3   969	    284B  52			 OutDX_AL:	 push	 dx
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 18
+logger.ASM
+
+
+
+3   970
+3   971	    284C			 WritePort:
+3   972	    284C  98					 cbw
+3   973	    284D  67| 01 45 00				 add	 [ebp],ax
+3   974	    2851  67| 8A 45 FC				 mov	 al,byte ptr [ebp-4]
+3   975
+3   976	    2855  36: 3B 16 0103r			 cmp		 dx, [ss:StartPort]
+3   977	    285A  72 1C	90 90				 jb		 @Other
+3   978
+3   979	    285E  36: 3B 16 0105r			 cmp		 dx, [ss:EndPort]
+3   980	    2863  77 13	90 90				 ja		 @Other
+3   981
+3   982	    2867  E6 80					 out		 80h, al ; Write to POST port.
+3   983
+3   984							 ; TODO: Properly log write here.
+3   985	    2869  1E					 push ds
+3   986	    286A  50					 push ax
+3   987	    286B  B8 0018				 mov ax, 18h
+3   988	    286E  8E D8					 mov ds, ax
+3   989	    2870  58					 pop ax
+3   990	    2871  67| A2 000B8000			 mov ds:[0B8000h], al
+3   991	    2877  1F					 pop ds
+3   992
+3   993	    2878			 @Other:
+3   994	    2878  EE					 out	 dx,al
+3   995	    2879  EB 40	90				 jmp	 @@AllRight
+3   996
+3   997	    287C			 Out@@_AL:
+3   998	    287C  52					 push	 dx
+3   999	    287D  67| 0F B6 13				 movzx	 dx,byte ptr [ebx]
+3  1000	    2881  FE C0					 inc	 al
+3  1001	    2883  EB C7					 jmp	 WritePort
+3  1002
+3  1003
+3  1004	    2885			 InAL_DX:
+3  1005	    2885  52					 push	 dx
+3  1006
+3  1007	    2886			 ReadPort:
+3  1008	    2886  98					 cbw
+3  1009	    2887  67| 01 45 00				 add	 [ebp],ax
+3  1010	    288B  EC					 in	 al,dx
+3  1011	    288C  67| 88 45 FC				 mov	 byte ptr [ebp-4],al
+3  1012
+3  1013	    2890  36: 3B 16 0103r			 cmp		 dx, [ss:StartPort]
+3  1014	    2895  72 E1					 jb		 @Other
+3  1015
+3  1016	    2897  36: 3B 16 0105r			 cmp		 dx, [ss:EndPort]
+3  1017	    289C  77 DA					 ja		 @Other
+3  1018
+3  1019	    289E  E6 80					 out		 80h, al ; Write to POST port.
+3  1020
+3  1021							 ; TODO: Properly log read here.
+3  1022	    28A0  1E					 push ds
+3  1023	    28A1  50					 push ax
+3  1024	    28A2  B8 0018				 mov ax, 18h
+3  1025	    28A5  8E D8					 mov ds, ax
+3  1026	    28A7  58					 pop ax
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 19
+logger.ASM
+
+
+
+3  1027	    28A8  67| A2 000B8000			 mov ds:[0B8000h], al
+3  1028	    28AE  1F					 pop ds
+3  1029
+3  1030	    28AF  EB 0A	90				 jmp	 @@AllRight
+3  1031
+3  1032	    28B2			 InAL_@@:
+3  1033	    28B2  52					 push	 dx
+3  1034	    28B3  FE C0					 inc	 al
+3  1035	    28B5  67| 0F B6 13				 movzx	 dx,byte ptr [ebx]
+3  1036	    28B9  EB CB					 jmp	 ReadPort
+3  1037
+3  1038
+3  1039	    28BB			 @@AllRight:
+3  1040	    28BB  5A					 pop	 dx
+3  1041	    28BC  66| 5D				 pop	 ebp
+3  1042	    28BE  1F					 pop	 ds
+3  1043	    28BF  66| 5B				 pop	 ebx
+3  1044	    28C1  66| 58				 pop	 eax
+3  1045	    28C3  66| CF				 iretd
+3  1046
+3  1047	    28C5			 TooBad:
+3  1048
+3  1049	    28C5			 PortHandler	 endp
+3  1050
+1  1051
+1  1052	    28C5  80 FC	CD				 cmp	 ah,0CDh
+1  1053	    28C8  0F 84	008C				 je	 DoIntNN
+1  1054	    28CC  80 FC	CC				 cmp	 ah,0CCh
+1  1055	    28CF  0F 84	00FB				 je	 DoInt03
+1  1056	    28D3  80 FC	F4				 cmp	 ah,0F4h
+1  1057	    28D6  0F 84	0175				 je	 DoHalt
+1  1058	    28DA  80 FC	0F				 cmp	 ah,00Fh
+1  1059	    28DD  74 33	90 90				 je	 PMinstr
+1  1060
+1  1061					 ; whoops! what	the $#$&$#! is that?
+1  1062	    28E1  66| 4B		 FailGPF:	 dec	 ebx
+1  1063	    28E3  1E					 push	 ds
+1  1064	    28E4  53					 push	 bx
+1  1065	    28E5  B8 0010				 mov	 ax,@gdData
+1  1066	    28E8  8E D8					 mov	 ds,ax
+1  1067	    28EA  E8 FC0C				 call	 CRLF
+1  1068	    28ED  BB 0174r				 mov	 bx,offset GPFmsg
+1  1069	    28F0  E8 FC10				 call	 WriteMsg
+1  1070	    28F3  5B					 pop	 bx
+1  1071	    28F4  1F					 pop	 ds
+1  1072	    28F5  BD 0010				 mov	 bp,16
+1  1073	    28F8  67| 8A 03		 DisplayInvComm: mov	 al,[ebx]
+1  1074	    28FB  66| 43				 inc	 ebx
+1  1075	    28FD  E8 FB40				 call	 HexOut
+1  1076	    2900  4D					 dec	 bp
+1  1077	    2901  75 F5					 jne	 DisplayInvComm
+1  1078	    2903  66| 5D				 pop	 ebp
+1  1079	    2905  1F					 pop	 ds
+1  1080	    2906  66| 5B				 pop	 ebx
+1  1081	    2908  66| 58				 pop	 eax
+1  1082	    290A  68 DEAD				 push	 0DEADh			 ;simulate errorNo
+1  1083	    290D  6A 0D			 sim13:		 push	 13
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 20
+logger.ASM
+
+
+
+1  1084	    290F  E9 FD5E				 jmp	 NotIO
+1  1085
+1  1086					 ;*****************************************************************************
+1  1087					 ; The following routines emulate vm86 instructions; On	entry:
+1  1088					 ; eax[31] = 1 if 'opsize' preceeded instruction;
+1  1089					 ; ah	   = count to adjust eip on stack
+1  1090					 ; al	   = instruction
+1  1091					 ; [ebx]   = next opcode byte
+1  1092					 ; ds	   = zerobase segment
+1  1093					 ; [ebp]   = address of	stack frame
+1  1094					 ;******* This routine emulates	PM instructions	(mov to/from CRx & DRx)	*******
+1  1095	    2912  67| 8A 23		 PMinstr:	 mov	 ah,[ebx]
+1  1096	    2915  FE C0					 inc	 al
+1  1097	    2917  80 FC	20				 cmp	 ah,20h
+1  1098	    291A  72 C5					 jb	 FailGPF
+1  1099	    291C  80 FC	23				 cmp	 ah,23h
+1  1100	    291F  77 C0					 ja	 FailGPF
+1  1101	    2921  66| 43				 inc	 ebx
+1  1102	    2923  80 FC	22				 cmp	 ah,22h
+1  1103	    2926  74 22	90 90				 je	 MovToCRx
+1  1104	    292A  36: 88 26 2946r	 ThreeBytes:	 mov	 byte ptr ss:MakeInstr+1,ah
+1  1105	    292F  67| 8A 23				 mov	 ah,[ebx]
+1  1106	    2932  FE C0					 inc	 al
+1  1107	    2934  36: 88 26 2947r			 mov	 byte ptr ss:MakeInstr+2,ah
+1  1108	    2939  98			 DoneInstr:	 cbw
+1  1109	    293A  67| 01 45 00				 add	 [ebp],ax		 ;fix return addr
+1  1110	    293E  66| 5D				 pop	 ebp
+1  1111	    2940  1F					 pop	 ds
+1  1112	    2941  66| 5B				 pop	 ebx
+1  1113	    2943  66| 58				 pop	 eax
+1  1114	    2945  0F 20	C0		 MakeInstr:	 mov	 eax,cr0
+1  1115	    2948  66| CF				 iretd
+1  1116	    294A  67| 83 45 00 03	 MovToCRx:	 add	 word ptr [ebp],3	 ;fix return addr
+1  1117	    294F  66| 5D				 pop	 ebp
+1  1118	    2951  1F					 pop	 ds
+1  1119	    2952  66| 5B				 pop	 ebx
+1  1120	    2954  66| 58				 pop	 eax
+1  1121	    2956  66| CF				 iretd
+1  1122
+1  1123
+1  1124					 ;***************** This routine emulates an Int nn instruction	***************
+1  1125	    2958  66| 51		 DoIntNN:	 push	 ecx
+1  1126	    295A  66| 52				 push	 edx
+1  1127	    295C  66| 56				 push	 esi
+1  1128	    295E  66| 67| 0F B7	75 10			 movzx	 esi,word ptr [ebp+10h]	 ;SS
+1  1129	    2964  66| C1 E6 04				 shl	 esi,4
+1  1130	    2968  66| 67| 0F B7	55 0C			 movzx	 edx,word ptr [ebp+0Ch]	 ;ESP
+1  1131	    296E  83 EA	02				 sub	 dx,2
+1  1132	    2971  67| 8B 4D 08				 mov	 cx,[ebp+08h]		 ;Get VM86 flags
+1  1133	    2975  67| 89 0C 16				 mov	 [esi+edx],cx		 ;Put into new stack frame
+1  1134	    2979  83 EA	02				 sub	 dx,2
+1  1135	    297C  67| 81 65 08 FCFF			 and	 word ptr [ebp+08h],1111110011111111b;Clear IF & TF
+1  1136	    2982  67| 8B 4D 04				 mov	 cx,[ebp+04h]		 ;Get VM86 CS
+1  1137	    2986  67| 89 0C 16				 mov	 [esi+edx],cx		 ;Put into new stack frame
+1  1138	    298A  83 EA	02				 sub	 dx,2
+1  1139	    298D  98					 cbw
+1  1140	    298E  40					 inc	 ax			 ;Comand length+1 (intno)
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 21
+logger.ASM
+
+
+
+1  1141	    298F  67| 03 45 00				 add	 ax,[ebp]		 ;Add VM86 IP
+1  1142	    2993  67| 89 04 16				 mov	 [esi+edx],ax		 ;Put into new stack frame
+1  1143	    2997  67| 83 6D 0C 06			 sub	 word ptr [ebp+0Ch],6	 ;adjust SP (Not ESP!)
+1  1144	    299C  66| 67| 0F B6	1B			 movzx	 ebx,byte ptr [ebx]
+1  1145	    29A1  66| 67| 0F B7	04 9D +			 movzx	 eax,word ptr [ebx*4]
+   1146		  00000000
+1  1147	    29AB  66| 67| 89 45	00			 mov	 [ebp],eax
+1  1148	    29B0  66| 67| 0F B7	04 9D +			 movzx	 eax,word ptr [ebx*4+2]
+   1149		  00000002
+1  1150	    29BA  66| 67| 89 45	04			 mov	 [ebp+4],eax
+1  1151	    29BF  66| 5E				 pop	 esi
+1  1152	    29C1  66| 5A				 pop	 edx			 ;Restore all
+1  1153	    29C3  66| 59				 pop	 ecx			 ;previously saved
+1  1154	    29C5  66| 5D				 pop	 ebp			 ;registers
+1  1155	    29C7  1F					 pop	 ds
+1  1156	    29C8  66| 5B				 pop	 ebx
+1  1157	    29CA  66| 58				 pop	 eax
+1  1158	    29CC  66| CF				 iretd				 ; Go, go, go !!!
+1  1159
+1  1160					 ;****************** This routine emulates an Int3 instruction ****************
+1  1161	    29CE  67| 81 7D 04 1234	 DoInt03:	 cmp	 word ptr [ebp+04h],01234h; Get	VM86 CS
+1  1162		  =DGROUP:29D2		 PatchCS2	 equ	 word ptr $-2
+1  1163	    29D4  74 62	90 90				 je	 DoMOVSD
+1  1164	    29D8  66| 51				 push	 ecx
+1  1165	    29DA  66| 52				 push	 edx
+1  1166	    29DC  66| 56				 push	 esi
+1  1167	    29DE  66| 67| 0F B7	75 10			 movzx	 esi,word ptr [ebp+10h]	 ;SS
+1  1168	    29E4  66| C1 E6 04				 shl	 esi,4
+1  1169	    29E8  66| 67| 0F B7	55 0C			 movzx	 edx,word ptr [ebp+0Ch]	 ;ESP
+1  1170	    29EE  83 EA	02				 sub	 dx,2
+1  1171	    29F1  67| 8B 4D 08				 mov	 cx,[ebp+08h]		 ;Get VM86 flags
+1  1172	    29F5  67| 89 0C 16				 mov	 [esi+edx],cx		 ;Put into new stack frame
+1  1173	    29F9  83 EA	02				 sub	 dx,2
+1  1174	    29FC  67| 81 65 08 FCFF			 and	 word ptr [ebp+08h],1111110011111111b;Clear IF & TF
+1  1175	    2A02  67| 8B 4D 04				 mov	 cx,[ebp+04h]		 ;Get VM86 CS
+1  1176	    2A06  67| 89 0C 16				 mov	 [esi+edx],cx		 ;Put into new stack frame
+1  1177	    2A0A  83 EA	02				 sub	 dx,2
+1  1178	    2A0D  98					 cbw
+1  1179	    2A0E  67| 03 45 00				 add	 ax,[ebp]		 ;Add VM86 IP
+1  1180	    2A12  67| 89 04 16				 mov	 [esi+edx],ax		 ;Put into new stack frame
+1  1181	    2A16  67| 83 6D 0C 06			 sub	 word ptr [ebp+0Ch],6	 ;adjust SP (Not ESP!)
+1  1182	    2A1B  A1 000C				 mov	 ax,ds:[3*4]
+1  1183	    2A1E  67| 89 45 00				 mov	 [ebp],ax
+1  1184	    2A22  A1 000E				 mov	 ax,ds:[3*4+2]
+1  1185	    2A25  67| 89 45 04				 mov	 [ebp+4],ax
+1  1186	    2A29  66| 5E				 pop	 esi
+1  1187	    2A2B  66| 5A				 pop	 edx			 ;Restore all
+1  1188	    2A2D  66| 59				 pop	 ecx			 ;previously saved
+1  1189	    2A2F  66| 5D				 pop	 ebp			 ;registers
+1  1190	    2A31  1F					 pop	 ds
+1  1191	    2A32  66| 5B				 pop	 ebx
+1  1192	    2A34  66| 58				 pop	 eax
+1  1193	    2A36  66| CF				 iretd				 ;Go, go, go !!!
+1  1194
+1  1195	    2A38  67| FF 45 00		 DoMOVSD:	 inc	 word ptr [ebp]
+1  1196	    2A3C  66| 5D				 pop	 ebp
+1  1197	    2A3E  1F					 pop	 ds
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 22
+logger.ASM
+
+
+
+1  1198	    2A3F  66| 5B				 pop	 ebx
+1  1199	    2A41  66| 58				 pop	 eax
+1  1200	    2A43  B8 0018				 mov	 ax,@gdFlat
+1  1201	    2A46  8E D8					 mov	 ds,ax
+1  1202	    2A48  8E C0					 mov	 es,ax
+1  1203	    2A4A  F3> 67| A5				 rep	 movs word ptr [esi], word ptr [edi]
+1  1204	    2A4D  66| CF				 iretd
+1  1205
+1  1206	    2A4F  98			 DoHalt:	 cbw
+1  1207	    2A50  67| 01 45 00				 add	 [ebp],ax		 ;fix ip
+1  1208	    2A54  66| 5D				 pop	 ebp			 ;Ignore it
+1  1209	    2A56  1F					 pop	 ds
+1  1210	    2A57  66| 5B				 pop	 ebx
+1  1211	    2A59  66| 58				 pop	 eax
+1  1212	    2A5B  66| CF				 iretd
+1  1213
+1  1214					 ;*****************************************************************************
+1  1215					 ; This	is the interface routine to allow a protected mode program call	vm86
+1  1216					 ; interrupts. Call with es:bx pointing	to a I30parmBlock structure.
+1  1217
+1  1218	    2A5D			 Int30h:
+1  1219					 ;ƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒ>
+1  1220
+1  1221					 ;*****************************************************************************
+1  1222					 ;			  Handle hardware interrupt
+1  1223					 ;*****************************************************************************
+1  1224	    2A5D  67| 87 04 24		 HWint:		 xchg	 ax,[esp]
+1  1225	    2A61  2C 18					 sub	 al,18h
+1  1226	    2A63  3C 0F					 cmp	 al,0Fh
+1  1227	    2A65  76 04	90 90				 jbe	 IRQset
+1  1228	    2A69  04 60					 add	 al,48h+18h		 ;Vector IRQ8-F	to int 70-77
+1  1229	    2A6B			 IRQset:
+1  1230	    2A6B  66| 51				 push	 ecx
+1  1231	    2A6D  66| 52				 push	 edx
+1  1232	    2A6F  66| 56				 push	 esi
+1  1233	    2A71  BA 0018 90				 mov	 dx,@gdFlat
+1  1234	    2A75  8E DA					 mov	 ds,dx
+1  1235	    2A77  66| 67| 0F B7	74 24 +			 movzx	 esi,word ptr [esp+1Eh]	 ;SS
+   1236		  1E
+1  1237	    2A7E  66| C1 E6 04				 shl	 esi,4
+1  1238	    2A82  66| 67| 0F B7	54 24 +			 movzx	 edx,word ptr [esp+1Ah]	 ;ESP
+   1239		  1A
+1  1240	    2A89  83 EA	02				 sub	 dx,2
+1  1241	    2A8C  67| 8B 4C 24 16			 mov	 cx,[esp+16h]		 ;Get VM86 flags
+1  1242	    2A91  67| 89 0C 16				 mov	 [esi+edx],cx		 ;Put into new stack frame
+1  1243	    2A95  83 EA	02				 sub	 dx,2
+1  1244	    2A98  67| 81 64 24 16 FCFF			 and	 word ptr [esp+16h],1111110011111111b;Clear IF & TF
+1  1245		  =DGROUP:2A9D		 FlagsMask	 equ	 word ptr $-2
+1  1246	    2A9F  36: C7 06 2A9Dr FCFF			 mov	 ss:FlagsMask,1111110011111111b
+1  1247	    2AA6  67| 8B 4C 24 12			 mov	 cx,[esp+12h]		 ;Get VM86 CS
+1  1248	    2AAB  67| 89 0C 16				 mov	 [esi+edx],cx		 ;Put into new stack frame
+1  1249	    2AAF  83 EA	02				 sub	 dx,2
+1  1250	    2AB2  67| 8B 4C 24 0E			 mov	 cx,[esp+0Eh]		 ;Get VM86 IP
+1  1251	    2AB7  67| 89 0C 16				 mov	 [esi+edx],cx		 ;Put into new stack frame
+1  1252	    2ABB  67| 83 6C 24 1A 06			 sub	 word ptr [esp+1Ah],6	 ;adjust SP (Not ESP!)
+1  1253	    2AC1  66| 0F B6 D0				 movzx	 edx,al
+1  1254	    2AC5  67| 8B 04 95	      +			 mov	 ax,[edx*4+2]
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 23
+logger.ASM
+
+
+
+   1255		  00000002
+1  1256	    2ACD  67| 89 44 24 12			 mov	 [esp+12h],ax
+1  1257	    2AD2  67| 8B 04 95	      +			 mov	 ax,[edx*4]
+   1258		  00000000
+1  1259	    2ADA  67| 89 44 24 0E			 mov	 [esp+0Eh],ax
+1  1260	    2ADF  66| 5E				 pop	 esi
+1  1261	    2AE1  66| 5A				 pop	 edx
+1  1262	    2AE3  66| 59				 pop	 ecx
+1  1263	    2AE5  58					 pop	 ax
+1  1264	    2AE6  66| CF				 iretd				 ;Go, go, go !!!
+1  1265
+1  1266
+1  1267					 ;**** Following interpret interrupt number number as-is and pass control ****
+1  1268					 ;****************************** to VM86 handler *****************************
+1  1269	    2AE8  67| 87 04 24		 EmulateInt:	 xchg	 ax,[esp]
+1  1270	    2AEC  E9 FF7C				 jmp	 IRQset
+1  1271
+1  1272
+   1273							 include 386pdt.asm	      ;	Descriptor tables
+1  1274					 ;∞±≤€ﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂ€≤±∞
+1  1275					 ;∞±≤€		       A i386(R) protected mode	library			   €≤±∞
+1  1276					 ;∞±≤€		     (C)opyright 1993 by FRIENDS software		   €≤±∞
+1  1277					 ;∞±≤€			 Descriptor tables (GDT	& IDT)			   €≤±∞
+1  1278					 ;∞±≤€‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹€≤±∞
+1  1279
+1  1280					 ;*********************	Global Descriptor Table	(GDT) *************************
+1  1281					 ; NULL	descriptor
+1  1282							 GDTdescr GDT
+2  1283	    2AEF  FFFF 06*(??)		 GDT:		Desc386	<0FFFFh,,,,>
+1  1284					 ; Supervisor code segment
+1  1285							 GDTdescr gdCode,dfCode
+2  1286	    2AF7  FFFF 03*(??) 9A 02* +	 gdCode:	   Desc386 <0FFFFh,,,dfCode,>
+   1287		  (??)
+1  1288					 ; Supervisor data segment
+1  1289							 GDTdescr gdData,dfData
+2  1290	    2AFF  FFFF 03*(??) 92 02* +	 gdData:	   Desc386 <0FFFFh,,,dfData,>
+   1291		  (??)
+1  1292					 ; Flat	segment	(with zero base	and 4Gb	limit) descriptor
+1  1293							 GDTdescr gdFlat,dfData,df4GbLimit
+2  1294	    2B07  FFFF 03*(??) 92 8F  +	 gdFlat:	   Desc386 <0FFFFh,,,dfData,df4GbLimit>
+   1295		  01*(??)
+1  1296					 ; Video segment descriptor
+1  1297							 GDTdescr gdVideo,dfData
+2  1298	    2B0F  FFFF 03*(??) 92 02* +	 gdVideo:	    Desc386 <0FFFFh,,,dfData,>
+   1299		  (??)
+1  1300					 ; TSS itself
+1  1301							 GDTdescr gdTSS,dfTSS
+2  1302	    2B17  FFFF 03*(??) 89 02* +	 gdTSS:		  Desc386 <0FFFFh,,,dfTSS,>
+   1303		  (??)
+1  1304
+1  1305		  =0030			 GDTlen		 equ	  $-GDT
+1  1306
+1  1307					 ;******************* Interrupt	descriptor table (IDT) ************************
+1  1308		  =0000			 IDTentry	 =	  0
+1  1309	    2B1F			 IDT		 label	  near
+1  1310							 rept	  TopInt+1
+1  1311							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 24
+logger.ASM
+
+
+
+1  1312					 IDTentry	 =	  IDTentry+1
+1  1313							 endm
+2  1314							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1315	    2B1F  2512r	0008 01*(??)  +	 idInt0:	   Desc386 <small Int0,@gdCode,,dfIntGate>
+   1316		  8E 02*(??)
+2  1317							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1318	    2B27  2517r	0008 01*(??)  +	 idInt1:	   Desc386 <small Int1,@gdCode,,dfIntGate>
+   1319		  8E 02*(??)
+2  1320							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1321	    2B2F  251Cr	0008 01*(??)  +	 idInt2:	   Desc386 <small Int2,@gdCode,,dfIntGate>
+   1322		  8E 02*(??)
+2  1323							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1324	    2B37  2521r	0008 01*(??)  +	 idInt3:	   Desc386 <small Int3,@gdCode,,dfIntGate>
+   1325		  8E 02*(??)
+2  1326							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1327	    2B3F  2526r	0008 01*(??)  +	 idInt4:	   Desc386 <small Int4,@gdCode,,dfIntGate>
+   1328		  8E 02*(??)
+2  1329							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1330	    2B47  252Br	0008 01*(??)  +	 idInt5:	   Desc386 <small Int5,@gdCode,,dfIntGate>
+   1331		  8E 02*(??)
+2  1332							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1333	    2B4F  2530r	0008 01*(??)  +	 idInt6:	   Desc386 <small Int6,@gdCode,,dfIntGate>
+   1334		  8E 02*(??)
+2  1335							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1336	    2B57  2535r	0008 01*(??)  +	 idInt7:	   Desc386 <small Int7,@gdCode,,dfIntGate>
+   1337		  8E 02*(??)
+2  1338							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1339	    2B5F  253Ar	0008 01*(??)  +	 idInt8:	   Desc386 <small Int8,@gdCode,,dfIntGate>
+   1340		  8E 02*(??)
+2  1341							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1342	    2B67  253Fr	0008 01*(??)  +	 idInt9:	   Desc386 <small Int9,@gdCode,,dfIntGate>
+   1343		  8E 02*(??)
+2  1344							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1345	    2B6F  2544r	0008 01*(??)  +	 idInt10:	    Desc386 <small Int10,@gdCode,,dfIntGate>
+   1346		  8E 02*(??)
+2  1347							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1348	    2B77  2549r	0008 01*(??)  +	 idInt11:	    Desc386 <small Int11,@gdCode,,dfIntGate>
+   1349		  8E 02*(??)
+2  1350							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1351	    2B7F  254Er	0008 01*(??)  +	 idInt12:	    Desc386 <small Int12,@gdCode,,dfIntGate>
+   1352		  8E 02*(??)
+2  1353							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1354	    2B87  2553r	0008 01*(??)  +	 idInt13:	    Desc386 <small Int13,@gdCode,,dfIntGate>
+   1355		  8E 02*(??)
+2  1356							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1357	    2B8F  2558r	0008 01*(??)  +	 idInt14:	    Desc386 <small Int14,@gdCode,,dfIntGate>
+   1358		  8E 02*(??)
+2  1359							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1360	    2B97  255Dr	0008 01*(??)  +	 idInt15:	    Desc386 <small Int15,@gdCode,,dfIntGate>
+   1361		  8E 02*(??)
+2  1362							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1363	    2B9F  2562r	0008 01*(??)  +	 idInt16:	    Desc386 <small Int16,@gdCode,,dfIntGate>
+   1364		  8E 02*(??)
+2  1365							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1366	    2BA7  2567r	0008 01*(??)  +	 idInt17:	    Desc386 <small Int17,@gdCode,,dfIntGate>
+   1367		  8E 02*(??)
+2  1368							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 25
+logger.ASM
+
+
+
+3  1369	    2BAF  256Cr	0008 01*(??)  +	 idInt18:	    Desc386 <small Int18,@gdCode,,dfIntGate>
+   1370		  8E 02*(??)
+2  1371							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1372	    2BB7  2571r	0008 01*(??)  +	 idInt19:	    Desc386 <small Int19,@gdCode,,dfIntGate>
+   1373		  8E 02*(??)
+2  1374							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1375	    2BBF  2576r	0008 01*(??)  +	 idInt20:	    Desc386 <small Int20,@gdCode,,dfIntGate>
+   1376		  8E 02*(??)
+2  1377							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1378	    2BC7  257Br	0008 01*(??)  +	 idInt21:	    Desc386 <small Int21,@gdCode,,dfIntGate>
+   1379		  8E 02*(??)
+2  1380							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1381	    2BCF  2580r	0008 01*(??)  +	 idInt22:	    Desc386 <small Int22,@gdCode,,dfIntGate>
+   1382		  8E 02*(??)
+2  1383							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1384	    2BD7  2585r	0008 01*(??)  +	 idInt23:	    Desc386 <small Int23,@gdCode,,dfIntGate>
+   1385		  8E 02*(??)
+2  1386							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1387	    2BDF  258Ar	0008 01*(??)  +	 idInt24:	    Desc386 <small Int24,@gdCode,,dfIntGate>
+   1388		  8E 02*(??)
+2  1389							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1390	    2BE7  258Fr	0008 01*(??)  +	 idInt25:	    Desc386 <small Int25,@gdCode,,dfIntGate>
+   1391		  8E 02*(??)
+2  1392							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1393	    2BEF  2594r	0008 01*(??)  +	 idInt26:	    Desc386 <small Int26,@gdCode,,dfIntGate>
+   1394		  8E 02*(??)
+2  1395							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1396	    2BF7  2599r	0008 01*(??)  +	 idInt27:	    Desc386 <small Int27,@gdCode,,dfIntGate>
+   1397		  8E 02*(??)
+2  1398							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1399	    2BFF  259Er	0008 01*(??)  +	 idInt28:	    Desc386 <small Int28,@gdCode,,dfIntGate>
+   1400		  8E 02*(??)
+2  1401							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1402	    2C07  25A3r	0008 01*(??)  +	 idInt29:	    Desc386 <small Int29,@gdCode,,dfIntGate>
+   1403		  8E 02*(??)
+2  1404							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1405	    2C0F  25A8r	0008 01*(??)  +	 idInt30:	    Desc386 <small Int30,@gdCode,,dfIntGate>
+   1406		  8E 02*(??)
+2  1407							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1408	    2C17  25ADr	0008 01*(??)  +	 idInt31:	    Desc386 <small Int31,@gdCode,,dfIntGate>
+   1409		  8E 02*(??)
+2  1410							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1411	    2C1F  25B2r	0008 01*(??)  +	 idInt32:	    Desc386 <small Int32,@gdCode,,dfIntGate>
+   1412		  8E 02*(??)
+2  1413							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1414	    2C27  25B7r	0008 01*(??)  +	 idInt33:	    Desc386 <small Int33,@gdCode,,dfIntGate>
+   1415		  8E 02*(??)
+2  1416							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1417	    2C2F  25BCr	0008 01*(??)  +	 idInt34:	    Desc386 <small Int34,@gdCode,,dfIntGate>
+   1418		  8E 02*(??)
+2  1419							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1420	    2C37  25C1r	0008 01*(??)  +	 idInt35:	    Desc386 <small Int35,@gdCode,,dfIntGate>
+   1421		  8E 02*(??)
+2  1422							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1423	    2C3F  25C6r	0008 01*(??)  +	 idInt36:	    Desc386 <small Int36,@gdCode,,dfIntGate>
+   1424		  8E 02*(??)
+2  1425							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 26
+logger.ASM
+
+
+
+3  1426	    2C47  25CBr	0008 01*(??)  +	 idInt37:	    Desc386 <small Int37,@gdCode,,dfIntGate>
+   1427		  8E 02*(??)
+2  1428							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1429	    2C4F  25D0r	0008 01*(??)  +	 idInt38:	    Desc386 <small Int38,@gdCode,,dfIntGate>
+   1430		  8E 02*(??)
+2  1431							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1432	    2C57  25D5r	0008 01*(??)  +	 idInt39:	    Desc386 <small Int39,@gdCode,,dfIntGate>
+   1433		  8E 02*(??)
+2  1434							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1435	    2C5F  25DAr	0008 01*(??)  +	 idInt40:	    Desc386 <small Int40,@gdCode,,dfIntGate>
+   1436		  8E 02*(??)
+2  1437							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1438	    2C67  25DFr	0008 01*(??)  +	 idInt41:	    Desc386 <small Int41,@gdCode,,dfIntGate>
+   1439		  8E 02*(??)
+2  1440							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1441	    2C6F  25E4r	0008 01*(??)  +	 idInt42:	    Desc386 <small Int42,@gdCode,,dfIntGate>
+   1442		  8E 02*(??)
+2  1443							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1444	    2C77  25E9r	0008 01*(??)  +	 idInt43:	    Desc386 <small Int43,@gdCode,,dfIntGate>
+   1445		  8E 02*(??)
+2  1446							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1447	    2C7F  25EEr	0008 01*(??)  +	 idInt44:	    Desc386 <small Int44,@gdCode,,dfIntGate>
+   1448		  8E 02*(??)
+2  1449							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1450	    2C87  25F3r	0008 01*(??)  +	 idInt45:	    Desc386 <small Int45,@gdCode,,dfIntGate>
+   1451		  8E 02*(??)
+2  1452							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1453	    2C8F  25F8r	0008 01*(??)  +	 idInt46:	    Desc386 <small Int46,@gdCode,,dfIntGate>
+   1454		  8E 02*(??)
+2  1455							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1456	    2C97  25FDr	0008 01*(??)  +	 idInt47:	    Desc386 <small Int47,@gdCode,,dfIntGate>
+   1457		  8E 02*(??)
+2  1458							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1459	    2C9F  2602r	0008 01*(??)  +	 idInt48:	    Desc386 <small Int48,@gdCode,,dfIntGate>
+   1460		  8E 02*(??)
+2  1461							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1462	    2CA7  2607r	0008 01*(??)  +	 idInt49:	    Desc386 <small Int49,@gdCode,,dfIntGate>
+   1463		  8E 02*(??)
+2  1464							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1465	    2CAF  260Cr	0008 01*(??)  +	 idInt50:	    Desc386 <small Int50,@gdCode,,dfIntGate>
+   1466		  8E 02*(??)
+2  1467							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1468	    2CB7  2611r	0008 01*(??)  +	 idInt51:	    Desc386 <small Int51,@gdCode,,dfIntGate>
+   1469		  8E 02*(??)
+2  1470							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1471	    2CBF  2616r	0008 01*(??)  +	 idInt52:	    Desc386 <small Int52,@gdCode,,dfIntGate>
+   1472		  8E 02*(??)
+2  1473							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1474	    2CC7  261Br	0008 01*(??)  +	 idInt53:	    Desc386 <small Int53,@gdCode,,dfIntGate>
+   1475		  8E 02*(??)
+2  1476							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1477	    2CCF  2620r	0008 01*(??)  +	 idInt54:	    Desc386 <small Int54,@gdCode,,dfIntGate>
+   1478		  8E 02*(??)
+2  1479							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1480	    2CD7  2625r	0008 01*(??)  +	 idInt55:	    Desc386 <small Int55,@gdCode,,dfIntGate>
+   1481		  8E 02*(??)
+2  1482							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 27
+logger.ASM
+
+
+
+3  1483	    2CDF  262Ar	0008 01*(??)  +	 idInt56:	    Desc386 <small Int56,@gdCode,,dfIntGate>
+   1484		  8E 02*(??)
+2  1485							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1486	    2CE7  262Fr	0008 01*(??)  +	 idInt57:	    Desc386 <small Int57,@gdCode,,dfIntGate>
+   1487		  8E 02*(??)
+2  1488							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1489	    2CEF  2634r	0008 01*(??)  +	 idInt58:	    Desc386 <small Int58,@gdCode,,dfIntGate>
+   1490		  8E 02*(??)
+2  1491							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1492	    2CF7  2639r	0008 01*(??)  +	 idInt59:	    Desc386 <small Int59,@gdCode,,dfIntGate>
+   1493		  8E 02*(??)
+2  1494							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1495	    2CFF  263Er	0008 01*(??)  +	 idInt60:	    Desc386 <small Int60,@gdCode,,dfIntGate>
+   1496		  8E 02*(??)
+2  1497							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1498	    2D07  2643r	0008 01*(??)  +	 idInt61:	    Desc386 <small Int61,@gdCode,,dfIntGate>
+   1499		  8E 02*(??)
+2  1500							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1501	    2D0F  2648r	0008 01*(??)  +	 idInt62:	    Desc386 <small Int62,@gdCode,,dfIntGate>
+   1502		  8E 02*(??)
+2  1503							 IDTdescr idInt%IDTentry,Int%IDTentry,dfIntGate
+3  1504	    2D17  264Dr	0008 01*(??)  +	 idInt63:	    Desc386 <small Int63,@gdCode,,dfIntGate>
+   1505		  8E 02*(??)
+1  1506		  =0200			 IDTlen		 equ	  $-IDT
+1  1507
+   1508
+   1509
+   1510
+   1511
+   1512					 ;============================== Non resident code ============================
+   1513
+   1514
+   1515
+   1516	    2D1F			 Setup_IOmap  proc near		    ;Sets bits in IO map for Tandy, PS/2 and sound card	ports
+   1517	    2D1F  0E					 push cs
+   1518	    2D20  07					 pop es
+   1519
+   1520	    2D21  50					 push ax
+   1521	    2D22  53					 push bx
+   1522	    2D23  51					 push cx
+   1523	    2D24  52					 push dx
+   1524	    2D25  56					 push si
+   1525
+   1526	    2D26  8B 1E	0103r				 mov bx, StartPort
+   1527	    2D2A			 .loop:
+   1528	    2D2A  8B C3					 mov ax,bx
+   1529	    2D2C  33 D2					 xor dx,dx
+   1530	    2D2E  B9 0008				 mov cx, 8
+   1531	    2D31  F7 F1					 div cx
+   1532
+   1533	    2D33  05 025Ar				 add ax, offset	IOportMap
+   1534	    2D36  8B F0					 mov si, ax
+   1535
+   1536	    2D38  B0 01					 mov al, 1
+   1537	    2D3A  8A CA					 mov cl, dl
+   1538	    2D3C  D2 E0					 shl al, cl
+   1539
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 28
+logger.ASM
+
+
+
+   1540	    2D3E  08 04					 or [si], al
+   1541
+   1542	    2D40  43					 inc bx
+   1543	    2D41  3B 1E	0105r				 cmp bx, EndPort
+   1544	    2D45  76 E3					 jbe .loop
+   1545
+   1546	    2D47  5E					 pop si
+   1547	    2D48  5A					 pop dx
+   1548	    2D49  59					 pop cx
+   1549	    2D4A  5B					 pop bx
+   1550	    2D4B  58					 pop ax
+   1551	    2D4C  C3					 retn
+   1552	    2D4D					 endp
+   1553
+   1554
+   1555	    2D4D			 Init:
+   1556	    2D4D  B8 0003				 mov ax,03
+   1557	    2D50  CD 10					 int 10h
+   1558
+   1559	    2D52  BE 324Cr				 mov si,offset TitleMsg
+   1560	    2D55  E8 0429				 call write_string
+   1561
+   1562	    2D58  33 C0					 xor ax,ax
+   1563	    2D5A  BE 0080				 mov si,80h
+   1564	    2D5D  AC					 lodsb
+   1565	    2D5E  3C 00					 cmp al,0
+   1566	    2D60  0F 84	0083				 je  NoValidCmd		 ;There	are no parameters
+   1567
+   1568	    2D64  8B C8					 mov cx,ax		 ;Get Commandline
+   1569	    2D66  BF 335Cr				 mov di,offset CmdLine
+   1570
+   1571	    2D69			 .GetCmdString:
+   1572	    2D69  AC					 lodsb
+   1573	    2D6A  AA					 stosb
+   1574	    2D6B  E2 FC					 loop .GetCmdString
+   1575	    2D6D  32 C0					 xor al,al
+   1576	    2D6F  AA					 stosb
+   1577
+   1578	    2D70			 Check_Options:
+   1579	    2D70  B8 335Cr				 mov ax,offset CmdLine
+   1580	    2D73  E8 037C				 call string_uppercase	;make command line uppercase
+   1581	    2D76  8B F0					 mov si,ax
+   1582	    2D78  E8 03A2				 call string_parse	;Parse different strings
+   1583
+   1584							 ; AX and BX should have options, CX and DX should not
+   1585	    2D7B  0B C0					 or ax,ax
+   1586	    2D7D  74 68	90 90				 jz NoValidCmd
+   1587	    2D81  0B DB					 or bx,bx
+   1588	    2D83  74 62	90 90				 jz NoValidCmd
+   1589	    2D87  0B C9					 or cx,cx
+   1590	    2D89  75 5C	90 90				 jnz NoValidCmd
+   1591	    2D8D  0B D2					 or dx,dx
+   1592	    2D8F  75 56	90 90				 jnz NoValidCmd
+   1593
+   1594							 ; Parse start port
+   1595	    2D93  E8 0421				 call string_to_int_hex
+   1596	    2D96  73 4F	90 90				 jnc NoValidCmd
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 29
+logger.ASM
+
+
+
+   1597	    2D9A  A3 0103r				 mov	 StartPort, ax
+   1598
+   1599							 ; Parse end port
+   1600	    2D9D  8B C3					 mov ax,bx
+   1601	    2D9F  E8 0415				 call string_to_int_hex
+   1602	    2DA2  73 43	90 90				 jnc NoValidCmd
+   1603	    2DA6  A3 0105r				 mov	 EndPort, ax
+   1604
+   1605	    2DA9  3B 06	0103r				 cmp ax, StartPort
+   1606	    2DAD  72 38	90 90				 jb NoValidCmd
+   1607
+   1608	    2DB1			 Start_V86:
+   1609	    2DB1  F8					 clc
+   1610	    2DB2  E8 015E				 call	 CheckCPU
+   1611	    2DB5  E8 FF67				 call	 Setup_IOmap
+   1612	    2DB8  E8 01C4				 call	 SwitchToPM
+   1613	    2DBB  E8 02D5				 call	 SwitchToVM86
+   1614
+   1615	    2DBE  BE 326Dr				 mov	 si,offset V86SuccessMsg
+   1616	    2DC1  E8 03BD				 call	 write_string
+   1617
+   1618	    2DC4  BE 3290r				 mov		 si,offset LoggingMsg
+   1619	    2DC7  E8 03B7				 call	 write_string
+   1620	    2DCA  A1 0103r				 mov		 ax,StartPort
+   1621	    2DCD  E8 0449				 call	 print_int_hex
+   1622	    2DD0  BE 3268r				 mov		 si, offset Hyphen
+   1623	    2DD3  E8 03AB				 call	 write_string
+   1624	    2DD6  A1 0105r				 mov		 ax,EndPort
+   1625	    2DD9  E8 043D				 call	 print_int_hex
+   1626	    2DDC  BE 326Ar				 mov		 si, offset Return
+   1627	    2DDF  E8 039F				 call	 write_string
+   1628
+   1629	    2DE2  BA 2D1Fr				 mov dx, offset	Setup_IOmap   ;Everything that should remain memory resident+
+   1630					 stands	before Setup_IOmap
+   1631	    2DE5  CD 27					 int 27h		      ;TSR
+   1632
+   1633	    2DE7			 NoValidCmd:
+   1634	    2DE7  BE 32D2r				 mov si,offset BadOption
+   1635	    2DEA  E8 0394				 call write_string
+   1636
+   1637	    2DED  B4 4C					 mov ah,4Ch
+   1638	    2DEF  CD 21					 int 21h
+   1639
+   1640							 include 386rdata.asm	      ;	Real-mode data
+1  1641					 ;∞±≤€ﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂ€≤±∞
+1  1642					 ;∞±≤€		       A i386(R) protected mode	library			   €≤±∞
+1  1643					 ;∞±≤€		     (C)opyright 1993 by FRIENDS software		   €≤±∞
+1  1644					 ;∞±≤€				 Real-mode data				   €≤±∞
+1  1645					 ;∞±≤€‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹€≤±∞
+1  1646
+1  1647	    2DF1  0D 0A	45 52 52 4F 52+	 CPUerror:	 db	 0Dh,0Ah,'ERROR: This program requires an i386 or higher!',0Dh,0Ah, +
+   1648		  3A 20	54 68 69 73 20+	 '$'
+   1649		  70 72	6F 67 72 61 6D+
+   1650		  20 72	65 71 75 69 72+
+   1651		  65 73	20 61 6E 20 69+
+   1652		  33 38	36 20 6F 72 20+
+   1653		  68 69	67 68 65 72 21+
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 30
+logger.ASM
+
+
+
+   1654		  0D 0A	24
+1  1655	    2E25  0D 0A	45 52 52 4F 52+	 AlreadyV86:	 db	 0Dh,0Ah,'ERROR: Processor is already running in protected mode!',  +
+   1656		  3A 20	50 72 6F 63 65+	 0Dh,0Ah,'$'
+   1657		  73 73	6F 72 20 69 73+
+   1658		  20 61	6C 72 65 61 64+
+   1659		  79 20	72 75 6E 6E 69+
+   1660		  6E 67	20 69 6E 20 70+
+   1661		  72 6F	74 65 63 74 65+
+   1662		  64 20	6D 6F 64 65 21+
+   1663		  0D 0A	24
+1  1664	    2E60  0D 0A	45 52 52 4F 52+	 A20error:	 db	 0Dh,0Ah,'ERROR: Cannot	control	A20 line!',0Dh,0Ah,'$'
+   1665		  3A 20	43 61 6E 6E 6F+
+   1666		  74 20	63 6F 6E 74 72+
+   1667		  6F 6C	20 41 32 30 20+
+   1668		  6C 69	6E 65 21 0D 0A+
+   1669		  24
+1  1670
+   1671							 include 386preal.asm	      ;	Real-mode subroutines
+1  1672					 ;∞±≤€ﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂﬂ€≤±∞
+1  1673					 ;∞±≤€		       A i386(R) protected mode	library			   €≤±∞
+1  1674					 ;∞±≤€		     (C)opyright 1993 by FRIENDS software		   €≤±∞
+1  1675					 ;∞±≤€			   Real-mode use routines			   €≤±∞
+1  1676					 ;∞±≤€‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹€≤±∞
+1  1677
+1  1678					 ;*****************************************************************************
+1  1679					 ; Routine to control A20 line;	AL=1 to	turn A20 on (enable) or	0 to disable.
+1  1680					 ; Returns ZF=1	if error
+1  1681					 ;*****************************************************************************
+1  1682	    2E84			 SetA20		 proc	 near
+1  1683	    2E84  50					 push	 ax
+1  1684	    2E85  B8 4300				 mov	 ax,4300h		 ; XMS driver detection
+1  1685	    2E88  CD 2F					 int	 2Fh
+1  1686	    2E8A  3C 80					 cmp	 al,80h
+1  1687	    2E8C  75 1A	90 90				 jne	 @@NoXMSdriver
+1  1688
+1  1689	    2E90  B8 4310				 mov	 ax,4310h		 ; XMS control function
+1  1690	    2E93  CD 2F					 int	 2Fh
+1  1691	    2E95  58					 pop	 ax
+1  1692	    2E96  0E					 push	 cs
+1  1693	    2E97  68 2ED6r				 push	 offset	@@ReturnCZF
+1  1694	    2E9A  06					 push	 es
+1  1695	    2E9B  53					 push	 bx
+1  1696	    2E9C  3C 00					 cmp	 al,0
+1  1697	    2E9E  74 05	90 90				 je	 @@Disable
+1  1698
+1  1699	    2EA2  B4 03					 mov	 ah,3			 ; Global enable A20
+1  1700	    2EA4  CB					 retf
+1  1701
+1  1702	    2EA5  B4 04			 @@Disable:	 mov	 ah,4			 ; Global disable A20
+1  1703	    2EA7  CB					 retf
+1  1704
+1  1705	    2EA8  58			 @@NoXMSdriver:	 pop	 ax
+1  1706	    2EA9  51					 push	 cx
+1  1707	    2EAA  B4 DF					 mov	 ah,0DFh		 ; A20 On
+1  1708	    2EAC  0A C0					 or	 al,al
+1  1709	    2EAE  75 04	90 90				 jnz	 @@a20_1
+1  1710	    2EB2  B4 DD					 mov	 ah,0DDh		 ; A20 Off
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 31
+logger.ASM
+
+
+
+1  1711	    2EB4  E8 0024		 @@a20_1:	 call	 @@KeyWait
+1  1712	    2EB7  74 1B	90 90				 jz	 @@a20_err
+1  1713	    2EBB  B0 D1					 mov	 al,0D1h
+1  1714	    2EBD  E6 64					 out	 64h,al
+1  1715	    2EBF  E8 0019				 call	 @@KeyWait
+1  1716	    2EC2  8A C4					 mov	 al,ah
+1  1717	    2EC4  E6 60					 out	 60h,al
+1  1718	    2EC6  E8 0012				 call	 @@KeyWait
+1  1719	    2EC9  74 09	90 90				 jz	 @@a20_err
+1  1720	    2ECD  B0 FF					 mov	 al,0FFh
+1  1721	    2ECF  E6 64					 out	 64h,al
+1  1722	    2ED1  E8 0007				 call	 @@KeyWait
+1  1723	    2ED4  59			 @@a20_err:	 pop	 cx
+1  1724	    2ED5  C3					 ret
+1  1725	    2ED6  B0 01			 @@ReturnCZF:	 mov	 al,1
+1  1726	    2ED8  85 C0					 test	 ax,ax
+1  1727	    2EDA  C3					 ret
+1  1728
+1  1729					 ;******** Wait	for keyboard controller	ready. Returns ZF=1 if timeout ********
+1  1730	    2EDB			 @@KeyWait	 proc	 near
+1  1731	    2EDB  33 C9					 xor	 cx,cx			 ; maximum time	out
+1  1732	    2EDD  49			 @@kw_1:	 dec	 cx
+1  1733	    2EDE  74 08	90 90				 jz	 @@kw_err
+1  1734	    2EE2  E4 64					 in	 al,64h
+1  1735	    2EE4  24 02					 and	 al,2
+1  1736	    2EE6  75 F5					 jnz	 @@kw_1
+1  1737	    2EE8  0B C9			 @@kw_err:	 or	 cx,cx
+1  1738	    2EEA  C3					 ret
+1  1739	    2EEB					 endp
+1  1740
+1  1741	    2EEB			 SetA20		 endp
+1  1742
+1  1743					 ;*****************************************************************************
+1  1744					 ;		 Macro to setup	a descriptor table pointer
+1  1745					 ;*****************************************************************************
+1  1746					 SetDT		 macro	 DTptr,DTlen,DT
+1  1747							 mov	 DTptr.TableSize,DTlen
+1  1748							 mov	 bx,offset DT
+1  1749							 call	 GetLinearAddr
+1  1750							 mov	 DTptr.TableAddr,eax
+1  1751							 endm
+1  1752
+1  1753					 ;*****************************************************************************
+1  1754					 ;	     Macro to setup a selector;	uses previous routine.
+1  1755					 ;*****************************************************************************
+1  1756					 Adjust		 macro	 Selector,Segmnt
+1  1757					 If Segmnt EQ AX
+1  1758					 Else
+1  1759							 mov	 ax,Segmnt
+1  1760					 EndIf
+1  1761							 mov	 bx,offset Selector
+1  1762							 call	 SelectorSetup
+1  1763							 endm
+1  1764
+1  1765					 ;*****************************************************************************
+1  1766					 ; Set a selector addressed by DS:BX to	contain	address	of real-mode segment AX
+1  1767					 ;*****************************************************************************
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 32
+logger.ASM
+
+
+
+1  1768	    2EEB			 SelectorSetup	 proc	 near
+1  1769	    2EEB  66| 0F B7 C0				 movzx	 eax,ax
+1  1770	    2EEF  66| C1 E0 04				 shl	 eax,4
+1  1771	    2EF3  89 47	02				 mov	 [bx].Base0to15,ax
+1  1772	    2EF6  66| C1 E8 10				 shr	 eax,16
+1  1773	    2EFA  88 47	04				 mov	 [bx].Base16to23,al
+1  1774	    2EFD  88 67	07				 mov	 [bx].Base24to31,ah
+1  1775	    2F00  C3					 ret
+1  1776	    2F01					 endp
+1  1777
+1  1778
+1  1779					 ;*****************************************************************************
+1  1780					 ;	  Return in EAX	linear address of a location adressed by DS:BX
+1  1781					 ;*****************************************************************************
+1  1782	    2F01			 GetLinearAddr	 proc	 near
+1  1783	    2F01  8C D8					 mov	 ax,ds
+1  1784	    2F03  66| 0F B7 C0				 movzx	 eax,ax
+1  1785	    2F07  66| 0F B7 DB				 movzx	 ebx,bx
+1  1786	    2F0B  66| C1 E0 04				 shl	 eax,4
+1  1787	    2F0F  66| 03 C3				 add	 eax,ebx
+1  1788	    2F12  C3					 ret
+1  1789	    2F13					 endp
+1  1790
+1  1791					 ;*****************************************************************************
+1  1792					 ;     Check if	processor is a i386(R) or higher - if not, stop	execution
+1  1793					 ;*****************************************************************************
+1  1794	    2F13			 CheckCPU	 proc	 near
+1  1795	    2F13  54					 push	 sp
+1  1796	    2F14  5A					 pop	 dx
+1  1797	    2F15  3B D4					 cmp	 dx,sp
+1  1798	    2F17  75 28	90 90				 jne	 @@isNot386
+1  1799	    2F1B  0F 01	E2				 smsw	 dx			 ;Check	if we are
+1  1800	    2F1E  F6 C2	01				 test	 dl,1			 ;already in V86 mode
+1  1801	    2F21  74 08	90 90				 je	 @@NotV86
+1  1802	    2F25  BA 2E25r				 mov	 dx,offset AlreadyV86
+1  1803	    2F28  EB 1A	90				 jmp	 PrintAndExit
+1  1804	    2F2B  9C			 @@NotV86:	 pushf				 ;Check	CPU by toggling
+1  1805	    2F2C  58					 pop	 ax			 ;Nested Task (NT) bit
+1  1806	    2F2D  35 4000				 xor	 ax,4000h		 ;in EFLAGS register
+1  1807	    2F30  50					 push	 ax
+1  1808	    2F31  9D					 popf
+1  1809	    2F32  9C					 pushf
+1  1810	    2F33  5B					 pop	 bx
+1  1811	    2F34  35 4000				 xor	 ax,4000h
+1  1812	    2F37  50					 push	 ax
+1  1813	    2F38  9D					 popf
+1  1814	    2F39  9C					 pushf
+1  1815	    2F3A  58					 pop	 ax
+1  1816	    2F3B  3B C3					 cmp	 ax,bx
+1  1817	    2F3D  75 0E	90 90				 jne	 @@Is386
+1  1818	    2F41  BA 2DF1r		 @@IsNot386:	 mov	 dx,offset CPUerror
+1  1819	    2F44  B4 09			 PrintAndExit:	 mov	 ah,9
+1  1820	    2F46  CD 21					 int	 21h
+1  1821	    2F48  B8 4C01				 mov	 ax,4C01h		 ;Terminate program
+1  1822	    2F4B  CD 21					 int	 21h
+1  1823	    2F4D  B0 01			 @@Is386:	 mov	 al,1
+1  1824	    2F4F  E8 FF32				 call	 SetA20
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 33
+logger.ASM
+
+
+
+1  1825	    2F52  75 07	90 90				 jnz	 @@Check_ok
+1  1826	    2F56  BA 2E60r				 mov	 dx,offset A20error
+1  1827	    2F59  EB E9					 jmp	 PrintAndExit
+1  1828	    2F5B  C3			 @@Check_ok:	 ret
+1  1829	    2F5C					 endp
+1  1830
+1  1831					 ;*****************************************************************************
+1  1832					 ;	   Initialize ISR segment, set interrupt gates & do LIDT
+1  1833					 ;*****************************************************************************
+1  1834	    2F5C			 InitializeIDT	 proc	 near
+1  1835	    2F5C  FA					 cli
+1  1836	    2F5D  C7 06	2B87r 27EFr			 mov	 idInt13.SegLimit,offset int13h
+1  1837							 SetDT	 DTload,IDTlen,IDT
+2  1838	    2F63  C7 06	01ECr 0200			 mov	 DTload.TableSize,IDTlen
+2  1839	    2F69  BB 2B1Fr				 mov	 bx,offset IDT
+2  1840	    2F6C  E8 FF92				 call	 GetLinearAddr
+2  1841	    2F6F  66| A3 01EEr				 mov	 DTload.TableAddr,eax
+1  1842	    2F73  0F 01	1E 01ECr			 lidt	 qword ptr DTload
+1  1843	    2F78  BB 2820				 mov	 bx,2820h
+1  1844	    2F7B  E8 F422				 call	 SetPIC
+1  1845	    2F7E  C3					 ret
+1  1846	    2F7F					 endp
+1  1847
+1  1848					 ;*****************************************************************************
+1  1849					 ;			Switch to protected mode
+1  1850					 ;*****************************************************************************
+1  1851	    2F7F			 SwitchToPM	 proc	 near
+1  1852	    2F7F  0F 01	0E 010Fr			 sidt	 SavedIDT
+1  1853	    2F84  8C 16	011Dr				 mov	 RMSS,ss
+1  1854	    2F88  66| 89 26 0119r			 mov	 RMESP,esp
+1  1855	    2F8D  B4 03					 mov	 ah,3
+1  1856	    2F8F  33 DB					 xor	 bx,bx
+1  1857	    2F91  CD 10					 int	 10h
+1  1858	    2F93  B8 0050				 mov	 ax,80
+1  1859	    2F96  F6 E6					 mul	 dh
+1  1860	    2F98  02 C2					 add	 al,dl
+1  1861	    2F9A  80 D4	00				 adc	 ah,0
+1  1862	    2F9D  A3 0117r				 mov	 word ptr Cursor,ax
+1  1863	    2FA0  E4 21					 in	 al,021h
+1  1864	    2FA2  A2 010Dr				 mov	 IntMask1,al
+1  1865	    2FA5  E4 A1					 in	 al,0A1h
+1  1866	    2FA7  A2 010Er				 mov	 IntMask2,al
+1  1867
+1  1868							 Adjust	 gdCode,cs
+2  1869	    2FAA  8C C8					 mov	 ax,cs
+2  1870	    2FAC  BB 2AF7r				 mov	 bx,offset gdCode
+2  1871	    2FAF  E8 FF39				 call	 SelectorSetup
+1  1872							 Adjust	 gdData,ds
+2  1873	    2FB2  8C D8					 mov	 ax,ds
+2  1874	    2FB4  BB 2AFFr				 mov	 bx,offset gdData
+2  1875	    2FB7  E8 FF31				 call	 SelectorSetup
+1  1876	    2FBA  06					 push	 es
+1  1877	    2FBB  6A 00					 push	 0
+1  1878	    2FBD  07					 pop	 es
+1  1879	    2FBE  B8 B800				 mov	 ax,0B800h
+1  1880	    2FC1  26: 81 3E 0463 03D4			 cmp	 word ptr es:[463h],3D4h
+1  1881	    2FC8  73 05	90 90				 jae	 @@Color
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 34
+logger.ASM
+
+
+
+1  1882	    2FCC  B8 B000				 mov	 ax,0B000h
+1  1883	    2FCF			 @@Color:	 Adjust	 gdVideo,ax
+2  1884	    2FCF  BB 2B0Fr				 mov	 bx,offset gdVideo
+2  1885	    2FD2  E8 FF16				 call	 SelectorSetup
+1  1886	    2FD5  07					 pop	 es
+1  1887
+1  1888							 SetAddr gdTSS,TaskSegment
+2  1889	    2FD6  66| 33 C0				 xor	 eax,eax
+2  1890	    2FD9  8C C8					 mov	 ax,cs
+2  1891	    2FDB  66| C1 E0 04				 shl	 eax,4
+2  1892	    2FDF  66| 05 000001F2r			 add	 eax,large offset TaskSegment
+2  1893	    2FE5  A3 2B19r				 mov	 gdTSS.Base0to15,ax
+2  1894	    2FE8  66| C1 E8 10				 shr	 eax,16
+2  1895	    2FEC  A2 2B1Br				 mov	 gdTSS.Base16to23,al
+1  1896	    2FEF  66| C7 06 01F6r     +			 mov	 TaskSegment.TSSespP0,offset P0ESP
+   1897		  00002360r
+1  1898	    2FF8  66| C7 06 022Ar     +			 mov	 TaskSegment.TSSesp,offset VM86SP
+   1899		  00002260r
+1  1900	    3001  66| C7 06 01FAr     +			 mov	 TaskSegment.TSSssP0,@gdData
+   1901		  00000010
+1  1902	    300A  8C 16	0242r				 mov	 word ptr TaskSegment.TSSss,ss
+1  1903	    300E  8C 2E	024Er				 mov	 word ptr TaskSegment.TSSgs,gs
+1  1904	    3012  8C 26	024Ar				 mov	 word ptr TaskSegment.TSSfs,fs
+1  1905	    3016  8C 1E	0246r				 mov	 word ptr TaskSegment.TSSds,ds
+1  1906	    301A  8C 06	023Ar				 mov	 word ptr TaskSegment.TSSes,es
+1  1907	    301E  8C 0E	023Er				 mov	 word ptr TaskSegment.TSScs,cs
+1  1908	    3022  66| C7 06 01CCr     +			 mov	 HIntFrame.i30esp,offset VM86SP
+   1909		  00002260r
+1  1910	    302B  8C 16	01D0r				 mov	 word ptr HIntFrame.i30ss,ss
+1  1911	    302F  8C 06	01D4r				 mov	 word ptr HIntFrame.i30es,es
+1  1912	    3033  8C 1E	01D8r				 mov	 word ptr HIntFrame.i30ds,ds
+1  1913	    3037  8C 26	01DCr				 mov	 word ptr HIntFrame.i30fs,fs
+1  1914	    303B  8C 2E	01E0r				 mov	 word ptr HIntFrame.i30gs,gs
+1  1915	    303F  8C 0E	23EEr				 mov	 PatchCS1,cs
+1  1916	    3043  8C 0E	29D2r				 mov	 PatchCS2,cs
+1  1917
+1  1918							 SetDT	 DTload,GDTlen,GDT
+2  1919	    3047  C7 06	01ECr 0030			 mov	 DTload.TableSize,GDTlen
+2  1920	    304D  BB 2AEFr				 mov	 bx,offset GDT
+2  1921	    3050  E8 FEAE				 call	 GetLinearAddr
+2  1922	    3053  66| A3 01EEr				 mov	 DTload.TableAddr,eax
+1  1923	    3057  0F 01	16 01ECr			 lgdt	 qword ptr DTload
+1  1924	    305C  E8 FEFD				 call	 InitializeIDT
+1  1925
+1  1926	    305F  0F 01	E2				 smsw	 dx			 ;Heh ;)
+1  1927	    3062  80 CA	01				 or	 dl,1
+1  1928	    3065  0F 01	F2				 lmsw	 dx			 ;Go to	protected mode
+1  1929	    3068  EA					 db	 0EAh			 ;Clear	prefetch & set CS
+1  1930	    3069  306Dr	0008				 dw	 $+4,@gdCode
+1  1931
+1  1932	    306D  B8 0010				 mov	 ax,@gdData
+1  1933	    3070  8E D8					 mov	 ds,ax
+1  1934	    3072  8E C0					 mov	 es,ax
+1  1935	    3074  8E E0					 mov	 fs,ax
+1  1936	    3076  8E E8					 mov	 gs,ax
+1  1937	    3078  8E D0					 mov	 ss,ax
+1  1938	    307A  5B					 pop	 bx
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 35
+logger.ASM
+
+
+
+1  1939	    307B  66| BC 00002360r			 mov	 esp,offset P0ESP
+1  1940	    3081  B8 0028				 mov	 ax,@gdTSS
+1  1941	    3084  0F 00	D8				 ltr	 ax
+1  1942	    3087  A0 010Dr				 mov	 al,IntMask1
+1  1943	    308A  E6 21					 out	 021h,al
+1  1944	    308C  A0 010Er				 mov	 al,IntMask2
+1  1945	    308F  E6 A1					 out	 0A1h,al
+1  1946	    3091  FF E3					 jmp	 bx
+1  1947	    3093					 endp
+1  1948
+1  1949					 ;*****************************************************************************
+1  1950					 ;    Switch to	VM86 and continue execution from (Real-mode)CS:runVM86(label)
+1  1951					 ;*****************************************************************************
+1  1952	    3093			 SwitchToVM86	 proc	 near
+1  1953	    3093  FA					 cli
+1  1954	    3094  5B					 pop	 bx
+1  1955	    3095  66| 0F B7 DB				 movzx	 ebx,bx
+1  1956	    3099  B8 0010				 mov	 ax,@gdData
+1  1957	    309C  8E D8					 mov	 ds,ax
+1  1958	    309E  66| FF 36 024Er			 push	 TaskSegment.TSSgs
+1  1959	    30A3  66| FF 36 024Ar			 push	 TaskSegment.TSSfs
+1  1960	    30A8  66| FF 36 0246r			 push	 TaskSegment.TSSds
+1  1961	    30AD  66| FF 36 023Ar			 push	 TaskSegment.TSSes
+1  1962	    30B2  66| FF 36 0242r			 push	 TaskSegment.TSSss
+1  1963	    30B7  66| FF 36 0119r			 push	 RMESP
+1  1964	    30BC  66| 68 00023000			 push	 20000h	or StartIOPL	 ; Set VM86 & IOPL,clear IF
+1  1965	    30C2  66| FF 36 023Er			 push	 TaskSegment.TSScs
+1  1966	    30C7  66| 53				 push	 ebx
+1  1967	    30C9  66| 9C				 pushfd
+1  1968	    30CB  66| 58				 pop	 eax
+1  1969	    30CD  25 BFFF				 and	 ax,not	4000h		 ; Clear NT
+1  1970	    30D0  66| 50				 push	 eax
+1  1971	    30D2  66| 9D				 popfd
+1  1972	    30D4  66| CF				 iretd
+1  1973	    30D6					 endp
+1  1974
+   1975							 include strings.inc	      ;	String handling	routines
+1  1976					 ;String handling routines
+1  1977					 ;v 1.0	- June 2000 by Jan Knipperts
+1  1978					 ;Note:	Strings	must be	0 terminated
+1  1979
+1  1980
+1  1981					 ; ==================================================================
+1  1982					 ; string_length - Return length of a string
+1  1983					 ;
+1  1984					 ; IN: AX = string location
+1  1985					 ;
+1  1986					 ; OUT:	AX = length (other regs	preserved)
+1  1987					 ; ==========================7========================================
+1  1988	    30D6			 string_length:
+1  1989	    30D6  0F A8				 push gs			 ; The GS register can be used as temp store (386+)
+1  1990	    30D8  60				 pusha
+1  1991
+1  1992	    30D9  8B D8				 mov bx, ax			 ; Move	location of string to BX
+1  1993
+1  1994	    30DB  33 C9				 xor cx, cx			 ; Counter CX =	0
+1  1995
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 36
+logger.ASM
+
+
+
+1  1996	    30DD			 .l_more:
+1  1997	    30DD  32 C0				 xor al,al
+1  1998	    30DF  38 47	01			 cmp byte [bx],	al		 ; Zero	(end of	string)	yet?
+1  1999	    30E2  74 06	90 90			 je .l_done
+1  2000	    30E6  43				 inc bx				 ; If not, keep	adding
+1  2001	    30E7  41				 inc cx
+1  2002	    30E8  EB F3				 jmp .l_more
+1  2003
+1  2004	    30EA			 .l_done:
+1  2005	    30EA  8E E9				 mov gs, cx			 ; Store count before restoring	other registers
+1  2006	    30EC  61				 popa
+1  2007
+1  2008	    30ED  8C E8				 mov ax, gs			 ; Put count back into AX before returning
+1  2009	    30EF  0F A9				 pop gs
+1  2010	    30F1  C3				 ret
+1  2011
+1  2012					 ; ==================================================================
+1  2013					 ; string_uppercase - Convert zero-terminated string to	upper case
+1  2014					 ;
+1  2015					 ; IN: AX = string location
+1  2016					 ;
+1  2017					 ; OUT:	AX = string location
+1  2018					 ; ==================================================================
+1  2019	    30F2			 string_uppercase:
+1  2020	    30F2  60				 pusha
+1  2021	    30F3  8B F0				 mov si, ax			 ; Use SI to access string
+1  2022
+1  2023	    30F5			 .u_more:
+1  2024	    30F5  B0 00				 mov al,0
+1  2025	    30F7  38 44	01			 cmp byte [si],	al		 ; Zero-termination of string?
+1  2026	    30FA  74 1F	90 90			 je .done			 ; If so, quit
+1  2027
+1  2028	    30FE  B0 61				 mov al,'a'
+1  2029	    3100  38 44	01			 cmp byte [si],	al		 ; In the lower	case A to Z range?
+1  2030	    3103  72 13	90 90			 jb .noatoz
+1  2031	    3107  B0 7A				 mov al,'z'
+1  2032	    3109  38 44	01			 cmp byte [si],	al
+1  2033	    310C  77 0A	90 90			 ja .noatoz
+1  2034
+1  2035	    3110  B0 20				 mov al,20h
+1  2036	    3112  28 44	01			 sub byte [si],	al		 ; If so, convert input	char to	upper case
+1  2037
+1  2038	    3115  46				 inc si
+1  2039	    3116  EB DD				 jmp .u_more
+1  2040
+1  2041	    3118			 .noatoz:
+1  2042	    3118  46				 inc si
+1  2043	    3119  EB DA				 jmp .u_more
+1  2044
+1  2045	    311B			 .done:
+1  2046	    311B  61				 popa
+1  2047	    311C  C3				 ret
+1  2048
+1  2049
+1  2050					 ; ------------------------------------------------------------------
+1  2051					 ; string_parse	-- Take	string (eg "run	foo bar	baz") and return
+1  2052					 ; pointers to zero-terminated strings (eg AX =	"run", BX = "foo" etc.)
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 37
+logger.ASM
+
+
+
+1  2053					 ; IN: SI = string; OUT: AX, BX, CX, DX	= individual strings
+1  2054
+1  2055	    311D			 string_parse:
+1  2056	    311D  56				 push si
+1  2057
+1  2058	    311E  8B C6				 mov ax, si			 ; AX =	start of first string
+1  2059
+1  2060	    3120  AC				 lodsb				 ; Get a byte
+1  2061	    3121  3C 00				 cmp al,0			 ; End of string?
+1  2062	    3123  74 59	90 90			 je .finish
+1  2063	    3127  3C 20				 cmp al, ' '			 ; A space?
+1  2064	    3129  75 04	90 90			 jne .clear_adr
+1  2065	    312D  8B C6				 mov ax,si			 ; Update start	of first string
+1  2066
+1  2067	    312F			 .clear_adr:
+1  2068	    312F  33 DB				 xor bx, bx			 ; By default, other strings start empty
+1  2069	    3131  33 C9				 xor cx, cx			 ; Therefore we	set BX,	CX and DX to 0
+1  2070	    3133  33 D2				 xor dx, dx
+1  2071
+1  2072	    3135  50				 push ax			 ; Save	to retrieve at end
+1  2073
+1  2074	    3136			 .loop1:
+1  2075	    3136  AC				 lodsb				 ; Get a byte
+1  2076	    3137  3C 00				 cmp al,0			 ; End of string?
+1  2077	    3139  74 43	90 90			 je .finish
+1  2078	    313D  3C 20				 cmp al, ' '			 ; A space?
+1  2079	    313F  75 F5				 jne .loop1
+1  2080	    3141  83 EE	02			 sub si,2
+1  2081	    3144  B0 00				 mov al,0
+1  2082	    3146  88 44	01			 mov byte [si],al		 ; If so, zero-terminate this bit of the string
+1  2083
+1  2084	    3149  83 C6	02			 add si,2			 ; Store start of next string in BX
+1  2085	    314C  8B DE				 mov bx, si
+1  2086
+1  2087	    314E			 .loop2:				 ; Repeat the above for	CX and DX...
+1  2088	    314E  AC				 lodsb
+1  2089	    314F  3C 00				 cmp al,0
+1  2090	    3151  74 2B	90 90			 je .finish
+1  2091	    3155  3C 20				 cmp al, ' '
+1  2092	    3157  75 F5				 jne .loop2
+1  2093	    3159  83 EE	02			 sub si,2
+1  2094	    315C  B0 00				 mov al,0
+1  2095	    315E  88 44	01			 mov byte [si],	al
+1  2096
+1  2097	    3161  83 C6	02			 add si,2
+1  2098	    3164  8B CE				 mov cx, si
+1  2099
+1  2100	    3166			 .loop3:
+1  2101	    3166  AC				 lodsb
+1  2102	    3167  3C 00				 cmp al,0
+1  2103	    3169  74 13	90 90			 je .finish
+1  2104	    316D  3C 20				 cmp al,' '
+1  2105	    316F  75 F5				 jne .loop3
+1  2106	    3171  83 EE	02			 sub si,2
+1  2107	    3174  B0 00				 mov al,0
+1  2108	    3176  88 44	01			 mov byte [si],	al
+1  2109	    3179  83 C6	02			 add si,2
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 38
+logger.ASM
+
+
+
+1  2110	    317C  8B D6				 mov dx, si
+1  2111
+1  2112	    317E			 .finish:
+1  2113	    317E  58				 pop ax
+1  2114
+1  2115	    317F  5E				 pop si
+1  2116	    3180  C3				 ret
+1  2117
+1  2118
+1  2119					 ; ------------------------------------------------------------------
+1  2120					 ; write_string	-- Writes 0 terminated string to the screen and	returns
+1  2121					 ; IN: SI = string;
+1  2122
+1  2123	    3181			 write_string:
+1  2124	    3181  52			   push	dx
+1  2125	    3182  51			   push	cx
+1  2126	    3183  50			   push	ax
+1  2127
+1  2128	    3184  33 C9			   xor cx,cx
+1  2129	    3186			   Length_Loop:
+1  2130	    3186  AC			       lodsb
+1  2131	    3187  41			       inc cx
+1  2132	    3188  3C 00			       cmp al,0
+1  2133	    318A  75 FA			       jne Length_Loop
+1  2134	    318C  2B F1			   sub si,cx
+1  2135	    318E  49			   dec cx
+1  2136
+1  2137	    318F			  Write_Loop:
+1  2138	    318F  AC			    lodsb
+1  2139	    3190  8A D0			    mov	dl,al
+1  2140	    3192  B4 02			    mov	ah,2
+1  2141	    3194  CD 21			    int	21h
+1  2142	    3196  E2 F7			  loop Write_Loop
+1  2143
+1  2144	    3198  5A			  pop dx
+1  2145	    3199  59			  pop cx
+1  2146	    319A  58			  pop ax
+1  2147
+1  2148	    319B  C3			 ret
+1  2149
+1  2150					 ; ------------------------------------------------------------------
+1  2151					 ; string_compare -- See if two	strings	match
+1  2152					 ; IN: SI = string one,	DI = string two
+1  2153					 ; OUT:	carry set if same, clear if different
+1  2154
+1  2155	    319C			 string_compare:
+1  2156	    319C  60				 pusha
+1  2157
+1  2158	    319D			 .c_more:
+1  2159	    319D  8A 04				 mov al, [si]			 ; Retrieve string contents
+1  2160	    319F  8A 1D				 mov bl, [di]
+1  2161
+1  2162	    31A1  3A C3				 cmp al, bl			 ; Compare characters at current location
+1  2163	    31A3  75 0C	90 90			 jne .not_same
+1  2164
+1  2165	    31A7  3C 00				 cmp al, 0			 ; End of first	string?	Must also be end of second
+1  2166	    31A9  74 09	90 90			 je .terminated
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 39
+logger.ASM
+
+
+
+1  2167
+1  2168	    31AD  46				 inc si
+1  2169	    31AE  47				 inc di
+1  2170	    31AF  EB EC				 jmp .c_more
+1  2171
+1  2172	    31B1			 .not_same:				 ; If unequal lengths with same	beginning, the byte
+1  2173	    31B1  61				 popa				 ; comparison fails at shortest	string terminator
+1  2174	    31B2  F8				 clc				 ; Clear carry flag
+1  2175	    31B3  C3				 ret
+1  2176
+1  2177	    31B4			 .terminated:				 ; Both	strings	terminated at the same position
+1  2178	    31B4  61				 popa
+1  2179	    31B5  F9				 stc				 ; Set carry flag
+1  2180	    31B6  C3				 ret
+1  2181
+1  2182					 ; ------------------------------------------------------------------
+1  2183					 ; string_to_int_hex --	Parse hex format string
+1  2184					 ; IN: SI = string one
+1  2185					 ; OUT:	carry set if valid, int	in AX; carry clear on parse error
+1  2186
+1  2187	    31B7			 string_to_int_hex:
+1  2188	    31B7  53				 push bx
+1  2189	    31B8  33 DB				 xor bx,bx
+1  2190
+1  2191	    31BA			 .string_to_int_hex_next_char:
+1  2192	    31BA  8A 04				 mov al, [si]
+1  2193	    31BC  46				 inc si
+1  2194
+1  2195	    31BD  3C 00				 cmp al, 0		 ; Check for string termination
+1  2196	    31BF  74 4D	90 90			 je .string_to_int_hex_done
+1  2197
+1  2198	    31C3  3C 20				 cmp al, ' '		 ; Skip	whitespace
+1  2199	    31C5  74 F3				 je .string_to_int_hex_next_char
+1  2200
+1  2201	    31C7  3C 30				 cmp al, '0'		 ; Match digits
+1  2202	    31C9  72 0D	90 90			 jb .string_to_int_hex_not_digit
+1  2203	    31CD  3C 39				 cmp al, '9'
+1  2204	    31CF  77 07	90 90			 ja .string_to_int_hex_not_digit
+1  2205	    31D3  2C 30				 sub al,'0'
+1  2206	    31D5  EB 26	90			 jmp .string_to_int_hex_append
+1  2207
+1  2208	    31D8			 .string_to_int_hex_not_digit:
+1  2209	    31D8  3C 61				 cmp al, 'a'		 ; Match lower case A-F
+1  2210	    31DA  72 0D	90 90			 jb .string_to_int_hex_not_lower
+1  2211	    31DE  3C 66				 cmp al, 'f'
+1  2212	    31E0  77 07	90 90			 ja .string_to_int_hex_not_lower
+1  2213	    31E4  2C 57				 sub al,'a' - 10
+1  2214	    31E6  EB 15	90			 jmp .string_to_int_hex_append
+1  2215
+1  2216	    31E9			 .string_to_int_hex_not_lower:
+1  2217	    31E9  3C 41				 cmp al, 'A'		 ; Match lower case A-F
+1  2218	    31EB  72 0D	90 90			 jb .string_to_int_hex_not_upper
+1  2219	    31EF  3C 46				 cmp al, 'F'
+1  2220	    31F1  77 07	90 90			 ja .string_to_int_hex_not_upper
+1  2221	    31F5  2C 37				 sub al,'A' - 10
+1  2222	    31F7  EB 04	90			 jmp .string_to_int_hex_append
+1  2223
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 40
+logger.ASM
+
+
+
+1  2224	    31FA			 .string_to_int_hex_not_upper:
+1  2225	    31FA  EB 17	90			 jmp .string_to_int_hex_error	 ; Unhandled character
+1  2226
+1  2227	    31FD			 .string_to_int_hex_append:
+1  2228	    31FD  81 FB	0FFF			 cmp bx, 0FFFh
+1  2229	    3201  77 10	90 90			 ja .string_to_int_hex_error	 ; Overflow
+1  2230
+1  2231	    3205  C1 E3	04			 shl	 bx, 4
+1  2232	    3208  32 E4				 xor ah,ah
+1  2233	    320A  03 D8				 add bx, ax
+1  2234	    320C  EB AC				 jmp .string_to_int_hex_next_char
+1  2235
+1  2236	    320E			 .string_to_int_hex_done:
+1  2237	    320E  8B C3				 mov ax, bx
+1  2238	    3210  5B				 pop bx
+1  2239	    3211  F9				 stc
+1  2240	    3212  C3				 ret
+1  2241
+1  2242	    3213			 .string_to_int_hex_error:
+1  2243	    3213  B8 0BAD			 mov ax, 0BADh
+1  2244	    3216  5B			     pop bx
+1  2245	    3217  F8				 clc
+1  2246	    3218  C3				 ret
+1  2247
+1  2248
+1  2249					 ; ------------------------------------------------------------------
+1  2250					 ; print_int_hex -- Print integer to screen in hex format
+1  2251					 ; IN: AX = int
+1  2252
+1  2253	    3219			 print_int_hex:
+1  2254	    3219  50				 push ax
+1  2255	    321A  51				 push cx
+1  2256	    321B  52				 push dx
+1  2257
+1  2258	    321C  33 D2				 xor dx,dx
+1  2259	    321E  B9 0010			 mov cx, 10h
+1  2260	    3221  F7 F1				 div cx
+1  2261	    3223  0B C0				 or ax,	ax
+1  2262	    3225  74 05	90 90			 jz .is_least_significant_digit
+1  2263
+1  2264	    3229  E8 FFED			 call print_int_hex
+1  2265
+1  2266	    322C			 .is_least_significant_digit:
+1  2267	    322C  8B C2				 mov ax, dx
+1  2268	    322E  E8 0004			 call print_hex_digit
+1  2269
+1  2270	    3231  5A				 pop dx
+1  2271	    3232  59				 pop cx
+1  2272	    3233  58				 pop ax
+1  2273	    3234  C3				 ret
+1  2274
+1  2275					 ; ------------------------------------------------------------------
+1  2276					 ; print_hex_digit -- Print digit in lower nibble of AL	to screen.
+1  2277					 ; IN: AL = digit (0-15)
+1  2278
+1  2279	    3235			 print_hex_digit:
+1  2280	    3235  50				 push ax
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 41
+logger.ASM
+
+
+
+1  2281	    3236  52				 push dx
+1  2282
+1  2283	    3237  24 0F				 and al, 0Fh
+1  2284	    3239  04 30				 add	 al, '0'
+1  2285	    323B  3C 39				 cmp al, '9'
+1  2286	    323D  7E 04	90 90			 jle .is_number
+1  2287	    3241  04 07				 add al, 'A' - '0' - 10;
+1  2288	    3243			 .is_number:
+1  2289
+1  2290	    3243  8A D0				 mov dl,al
+1  2291	    3245  B4 02				 mov ah,2
+1  2292	    3247  CD 21				 int 21h
+1  2293
+1  2294	    3249  5A				 pop	 dx
+1  2295	    324A  58				 pop ax
+1  2296	    324B  C3				 ret
+   2297
+   2298
+   2299					 ;Data:
+   2300
+   2301	    324C  49 2F	4F 20 50 6F 72+			 TitleMsg	 db 'I/O Port Access Logger ',10,13,0
+   2302		  74 20	41 63 63 65 73+
+   2303		  73 20	4C 6F 67 67 65+
+   2304		  72 20	0A 0D 00
+   2305
+   2306	    3266  20 00					 Space		 db ' ',0
+   2307
+   2308	    3268  2D 00					 Hyphen		 db '-',0
+   2309
+   2310	    326A  0A 0D	00				 Return		 db 10,13,0
+   2311
+   2312	    326D  56 38	36 20 6D 6F 64+			 V86SuccessMsg	 db 'V86 mode successfully installed.',10,13,0
+   2313		  65 20	73 75 63 63 65+
+   2314		  73 73	66 75 6C 6C 79+
+   2315		  20 69	6E 73 74 61 6C+
+   2316		  6C 65	64 2E 0A 0D 00
+   2317
+   2318	    3290  50 6F	72 74 20 6C 6F+			 LoggingMsg	 db 'Port logging installed for	range ',0
+   2319		  67 67	69 6E 67 20 69+
+   2320		  6E 73	74 61 6C 6C 65+
+   2321		  64 20	66 6F 72 20 72+
+   2322		  61 6E	67 65 20 00
+   2323
+   2324	    32B2  49 6E	76 61 6C 69 64+			 InvalidHex	 db 'Invalid hex number	specified.',10,13,0
+   2325		  20 68	65 78 20 6E 75+
+   2326		  6D 62	65 72 20 73 70+
+   2327		  65 63	69 66 69 65 64+
+   2328		  2E 0A	0D 00
+   2329
+   2330	    32D2  0A 0D	55 73 61 67 65+			 BadOption	 db 10,13,'Usage: ',10,13
+   2331		  3A 20	0A 0D
+   2332	    32DD  4C 4F	47 47 45 52 2E+						 db 'LOGGER.COM	<start port> <end port>',10,13
+   2333		  43 4F	4D 20 3C 73 74+
+   2334		  61 72	74 20 70 6F 72+
+   2335		  74 3E	20 3C 65 6E 64+
+   2336		  20 70	6F 72 74 3E 0A+
+   2337		  0D
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 42
+logger.ASM
+
+
+
+   2338	    3301  0A 0D								 db 10,13
+   2339	    3303  45 78	61 6D 70 6C 65+						 db 'Example: ',10,13
+   2340		  3A 20	0A 0D
+   2341	    330E  4C 4F	47 47 45 52 2E+						 db 'LOGGER.COM	320 323',10,13
+   2342		  43 4F	4D 20 33 32 30+
+   2343		  20 33	32 33 0A 0D
+   2344	    3322  74 6F	20 6C 6F 67 20+						 db 'to	log access to all ports	fron 320h to 323h   +
+   2345		  61 63	63 65 73 73 20+	 inclusive.',10,13,0
+   2346		  74 6F	20 61 6C 6C 20+
+   2347		  70 6F	72 74 73 20 66+
+   2348		  72 6F	6E 20 33 32 30+
+   2349		  68 20	74 6F 20 33 32+
+   2350		  33 68	20 69 6E 63 6C+
+   2351		  75 73	69 76 65 2E 0A+
+   2352		  0D 00
+   2353
+   2354	    335C  0A*(00)				 CmdLine	 db 10 dup(0)
+   2355
+   2356							 end	 Start
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 43
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+.CLEAR_ADR			  Near	 DGROUP:312F
+.C_MORE				  Near	 DGROUP:319D
+.DONE				  Near	 DGROUP:311B
+.FINISH				  Near	 DGROUP:317E
+.GETCMDSTRING			  Near	 DGROUP:2D69
+.IS_LEAST_SIGNIFICANT_DIGIT	  Near	 DGROUP:322C
+.IS_NUMBER			  Near	 DGROUP:3243
+.LOOP				  Near	 DGROUP:2D2A
+.LOOP1				  Near	 DGROUP:3136
+.LOOP2				  Near	 DGROUP:314E
+.LOOP3				  Near	 DGROUP:3166
+.L_DONE				  Near	 DGROUP:30EA
+.L_MORE				  Near	 DGROUP:30DD
+.NOATOZ				  Near	 DGROUP:3118
+.NOT_SAME			  Near	 DGROUP:31B1
+.STRING_TO_INT_HEX_APPEND	  Near	 DGROUP:31FD
+.STRING_TO_INT_HEX_DONE		  Near	 DGROUP:320E
+.STRING_TO_INT_HEX_ERROR	  Near	 DGROUP:3213
+.STRING_TO_INT_HEX_NEXT_CHAR	  Near	 DGROUP:31BA
+.STRING_TO_INT_HEX_NOT_DIGIT	  Near	 DGROUP:31D8
+.STRING_TO_INT_HEX_NOT_LOWER	  Near	 DGROUP:31E9
+.STRING_TO_INT_HEX_NOT_UPPER	  Near	 DGROUP:31FA
+.TERMINATED			  Near	 DGROUP:31B4
+.U_MORE				  Near	 DGROUP:30F5
+??DATE				  Text	 "09/06/21"
+??FILENAME			  Text	 "logger  "
+??TIME				  Text	 "11:13:59"
+??VERSION			  Number 040A
+@32BIT				  Text	 0
+@@A20_1				  Near	 DGROUP:2EB4
+@@A20_ERR			  Near	 DGROUP:2ED4
+@@ALLRIGHT			  Near	 DGROUP:28BB
+@@CHECK_OK			  Near	 DGROUP:2F5B
+@@COLOR				  Near	 DGROUP:2FCF
+@@DISABLE			  Near	 DGROUP:2EA5
+@@D_0				  Near	 DGROUP:279A
+@@D_1				  Near	 DGROUP:27B2
+@@D_2				  Near	 DGROUP:27D3
+@@D_OK				  Near	 DGROUP:27E1
+@@IS386				  Near	 DGROUP:2F4D
+@@ISNOT386			  Near	 DGROUP:2F41
+@@KEYWAIT			  Near	 DGROUP:2EDB
+@@KW_1				  Near	 DGROUP:2EDD
+@@KW_ERR			  Near	 DGROUP:2EE8
+@@NOTV86			  Near	 DGROUP:2F2B
+@@NOXMSDRIVER			  Near	 DGROUP:2EA8
+@@RETURNCZF			  Near	 DGROUP:2ED6
+@@WM_END			  Near	 DGROUP:2511
+@CODE				  Text	 DGROUP
+@CODESIZE			  Text	 0
+@CPU				  Text	 0F8FH
+@CURSEG				  Text	 _TEXT
+@DATA				  Text	 DGROUP
+@DATASIZE			  Text	 0
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 44
+Symbol Table
+
+
+
+@FILENAME			  Text	 LOGGER
+@GDCODE				  Number 0008
+@GDDATA				  Number 0010
+@GDFLAT				  Number 0018
+@GDT				  Number 0000
+@GDTSS				  Number 0028
+@GDVIDEO			  Number 0020
+@IDINT0				  Number 0000
+@IDINT1				  Number 0008
+@IDINT10			  Number 0050
+@IDINT11			  Number 0058
+@IDINT12			  Number 0060
+@IDINT13			  Number 0068
+@IDINT14			  Number 0070
+@IDINT15			  Number 0078
+@IDINT16			  Number 0080
+@IDINT17			  Number 0088
+@IDINT18			  Number 0090
+@IDINT19			  Number 0098
+@IDINT2				  Number 0010
+@IDINT20			  Number 00A0
+@IDINT21			  Number 00A8
+@IDINT22			  Number 00B0
+@IDINT23			  Number 00B8
+@IDINT24			  Number 00C0
+@IDINT25			  Number 00C8
+@IDINT26			  Number 00D0
+@IDINT27			  Number 00D8
+@IDINT28			  Number 00E0
+@IDINT29			  Number 00E8
+@IDINT3				  Number 0018
+@IDINT30			  Number 00F0
+@IDINT31			  Number 00F8
+@IDINT32			  Number 0100
+@IDINT33			  Number 0108
+@IDINT34			  Number 0110
+@IDINT35			  Number 0118
+@IDINT36			  Number 0120
+@IDINT37			  Number 0128
+@IDINT38			  Number 0130
+@IDINT39			  Number 0138
+@IDINT4				  Number 0020
+@IDINT40			  Number 0140
+@IDINT41			  Number 0148
+@IDINT42			  Number 0150
+@IDINT43			  Number 0158
+@IDINT44			  Number 0160
+@IDINT45			  Number 0168
+@IDINT46			  Number 0170
+@IDINT47			  Number 0178
+@IDINT48			  Number 0180
+@IDINT49			  Number 0188
+@IDINT5				  Number 0028
+@IDINT50			  Number 0190
+@IDINT51			  Number 0198
+@IDINT52			  Number 01A0
+@IDINT53			  Number 01A8
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 45
+Symbol Table
+
+
+
+@IDINT54			  Number 01B0
+@IDINT55			  Number 01B8
+@IDINT56			  Number 01C0
+@IDINT57			  Number 01C8
+@IDINT58			  Number 01D0
+@IDINT59			  Number 01D8
+@IDINT6				  Number 0030
+@IDINT60			  Number 01E0
+@IDINT61			  Number 01E8
+@IDINT62			  Number 01F0
+@IDINT63			  Number 01F8
+@IDINT7				  Number 0038
+@IDINT8				  Number 0040
+@IDINT9				  Number 0048
+@INTERFACE			  Text	 000H
+@MODEL				  Text	 1
+@OTHER				  Near	 DGROUP:2878
+@STACK				  Text	 DGROUP
+@WORDSIZE			  Text	 2
+A20ERROR			  Near	 DGROUP:2E60
+ALREADYV86			  Near	 DGROUP:2E25
+BACK2DOS			  Near	 DGROUP:23CB
+BADOPTION			  Byte	 DGROUP:32D2
+BREAKPOINTID			  Number 0080
+CHECKCPU			  Near	 DGROUP:2F13
+CHECK_OPTIONS			  Near	 DGROUP:2D70
+CMDLINE				  Byte	 DGROUP:335C
+COLOR				  Byte	 DGROUP:0109
+CPUERROR			  Near	 DGROUP:2DF1
+CR				  Near	 DGROUP:2485
+CRLF				  Near	 DGROUP:24F9
+CURSOR				  Word	 DGROUP:0117
+DF4GBLIMIT			  Number 008F
+DFACCESSED			  Number 0001
+DFCALLGATE			  Number 008C
+DFCALLGATE286			  Number 0004
+DFCALLGATE386			  Number 000C
+DFCODE				  Number 009A
+DFCONFORMING			  Number 0004
+DFDATA				  Number 0092
+DFDPL0				  Number 0000
+DFDPL1				  Number 0020
+DFDPL2				  Number 0040
+DFDPL3				  Number 0060
+DFEXECUTABLE			  Number 0008
+DFEXPANDDOWN			  Number 0004
+DFINTGATE			  Number 008E
+DFINTGATE286			  Number 0006
+DFINTGATE386			  Number 000E
+DFLDT				  Number 0082
+DFLDT386			  Number 0002
+DFNOSYSTEM			  Number 0010
+DFPRESENT			  Number 0080
+DFREADABLE			  Number 0002
+DFSTACK				  Number 0096
+DFTASKGATE			  Number 0085
+DFTASKGATE386			  Number 0005
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 46
+Symbol Table
+
+
+
+DFTRAPGATE286			  Number 0007
+DFTRAPGATE386			  Number 000F
+DFTSS				  Number 0089
+DFTSS286			  Number 0001
+DFTSS386			  Number 0009
+DFTSSBUSY			  Number 0002
+DFUSE32				  Number 0040
+DFWRITEABLE			  Number 0002
+DISPLAYINVCOMM			  Near	 DGROUP:28F8
+DOHALT				  Near	 DGROUP:2A4F
+DOINT03				  Near	 DGROUP:29CE
+DOINTNN				  Near	 DGROUP:2958
+DOMOVSD				  Near	 DGROUP:2A38
+DONEINSTR			  Near	 DGROUP:2939
+DTLOAD				  Struct DGROUP:01EC DT386
+DUMPOFFS			  Dword	 DGROUP:0121
+DUMPSELC			  Word	 DGROUP:011F
+DUMPSIZE			  Word	 DGROUP:0125
+EMULATEINT			  Near	 DGROUP:2AE8
+ENDPORT				  Word	 DGROUP:0105
+ESPSTACK			  Number 0010
+FAILGPF				  Near	 DGROUP:28E1
+FLAGSMASK			  Number DGROUP:2A9D
+FSET				  Near	 DGROUP:281A
+GDCODE				  Near	 DGROUP:2AF7
+GDDATA				  Near	 DGROUP:2AFF
+GDFLAT				  Near	 DGROUP:2B07
+GDT				  Near	 DGROUP:2AEF
+GDTLEN				  Number 0030
+GDTOFFSET			  Number 0030
+GDTSS				  Near	 DGROUP:2B17
+GDVIDEO				  Near	 DGROUP:2B0F
+GETLINEARADDR			  Near	 DGROUP:2F01
+GPFMSG				  Byte	 DGROUP:0174
+GTABLE				  Byte	 DGROUP:014D
+HEXDIG				  Near	 DGROUP:244C
+HEXOUT				  Near	 DGROUP:2440
+HEXOUT2				  Near	 DGROUP:2439
+HEXOUT4				  Near	 DGROUP:242E
+HINTFRAME			  Struct DGROUP:01C0 I30PARMBLOCK
+HWINT				  Near	 DGROUP:2A5D
+HYPHEN				  Byte	 DGROUP:3268
+IDINT0				  Near	 DGROUP:2B1F
+IDINT1				  Near	 DGROUP:2B27
+IDINT10				  Near	 DGROUP:2B6F
+IDINT11				  Near	 DGROUP:2B77
+IDINT12				  Near	 DGROUP:2B7F
+IDINT13				  Near	 DGROUP:2B87
+IDINT14				  Near	 DGROUP:2B8F
+IDINT15				  Near	 DGROUP:2B97
+IDINT16				  Near	 DGROUP:2B9F
+IDINT17				  Near	 DGROUP:2BA7
+IDINT18				  Near	 DGROUP:2BAF
+IDINT19				  Near	 DGROUP:2BB7
+IDINT2				  Near	 DGROUP:2B2F
+IDINT20				  Near	 DGROUP:2BBF
+IDINT21				  Near	 DGROUP:2BC7
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 47
+Symbol Table
+
+
+
+IDINT22				  Near	 DGROUP:2BCF
+IDINT23				  Near	 DGROUP:2BD7
+IDINT24				  Near	 DGROUP:2BDF
+IDINT25				  Near	 DGROUP:2BE7
+IDINT26				  Near	 DGROUP:2BEF
+IDINT27				  Near	 DGROUP:2BF7
+IDINT28				  Near	 DGROUP:2BFF
+IDINT29				  Near	 DGROUP:2C07
+IDINT3				  Near	 DGROUP:2B37
+IDINT30				  Near	 DGROUP:2C0F
+IDINT31				  Near	 DGROUP:2C17
+IDINT32				  Near	 DGROUP:2C1F
+IDINT33				  Near	 DGROUP:2C27
+IDINT34				  Near	 DGROUP:2C2F
+IDINT35				  Near	 DGROUP:2C37
+IDINT36				  Near	 DGROUP:2C3F
+IDINT37				  Near	 DGROUP:2C47
+IDINT38				  Near	 DGROUP:2C4F
+IDINT39				  Near	 DGROUP:2C57
+IDINT4				  Near	 DGROUP:2B3F
+IDINT40				  Near	 DGROUP:2C5F
+IDINT41				  Near	 DGROUP:2C67
+IDINT42				  Near	 DGROUP:2C6F
+IDINT43				  Near	 DGROUP:2C77
+IDINT44				  Near	 DGROUP:2C7F
+IDINT45				  Near	 DGROUP:2C87
+IDINT46				  Near	 DGROUP:2C8F
+IDINT47				  Near	 DGROUP:2C97
+IDINT48				  Near	 DGROUP:2C9F
+IDINT49				  Near	 DGROUP:2CA7
+IDINT5				  Near	 DGROUP:2B47
+IDINT50				  Near	 DGROUP:2CAF
+IDINT51				  Near	 DGROUP:2CB7
+IDINT52				  Near	 DGROUP:2CBF
+IDINT53				  Near	 DGROUP:2CC7
+IDINT54				  Near	 DGROUP:2CCF
+IDINT55				  Near	 DGROUP:2CD7
+IDINT56				  Near	 DGROUP:2CDF
+IDINT57				  Near	 DGROUP:2CE7
+IDINT58				  Near	 DGROUP:2CEF
+IDINT59				  Near	 DGROUP:2CF7
+IDINT6				  Near	 DGROUP:2B4F
+IDINT60				  Near	 DGROUP:2CFF
+IDINT61				  Near	 DGROUP:2D07
+IDINT62				  Near	 DGROUP:2D0F
+IDINT63				  Near	 DGROUP:2D17
+IDINT7				  Near	 DGROUP:2B57
+IDINT8				  Near	 DGROUP:2B5F
+IDINT9				  Near	 DGROUP:2B67
+IDT				  Near	 DGROUP:2B1F
+IDTENTRY			  Number 0040
+IDTLEN				  Number 0200
+IDTOFFSET			  Number 0200
+INAL_@@				  Near	 DGROUP:28B2
+INAL_DX				  Near	 DGROUP:2885
+INIT				  Near	 DGROUP:2D4D
+INITIALIZEIDT			  Near	 DGROUP:2F5C
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 48
+Symbol Table
+
+
+
+INLOOP				  Near	 DGROUP:2820
+INT0				  Near	 DGROUP:2512
+INT1				  Near	 DGROUP:2517
+INT10				  Near	 DGROUP:2544
+INT11				  Near	 DGROUP:2549
+INT12				  Near	 DGROUP:254E
+INT13				  Near	 DGROUP:2553
+INT13H				  Near	 DGROUP:27EF
+INT14				  Near	 DGROUP:2558
+INT15				  Near	 DGROUP:255D
+INT16				  Near	 DGROUP:2562
+INT17				  Near	 DGROUP:2567
+INT18				  Near	 DGROUP:256C
+INT19				  Near	 DGROUP:2571
+INT2				  Near	 DGROUP:251C
+INT20				  Near	 DGROUP:2576
+INT21				  Near	 DGROUP:257B
+INT22				  Near	 DGROUP:2580
+INT23				  Near	 DGROUP:2585
+INT24				  Near	 DGROUP:258A
+INT25				  Near	 DGROUP:258F
+INT26				  Near	 DGROUP:2594
+INT27				  Near	 DGROUP:2599
+INT28				  Near	 DGROUP:259E
+INT29				  Near	 DGROUP:25A3
+INT3				  Near	 DGROUP:2521
+INT30				  Near	 DGROUP:25A8
+INT30H				  Near	 DGROUP:2A5D
+INT31				  Near	 DGROUP:25AD
+INT32				  Near	 DGROUP:25B2
+INT33				  Near	 DGROUP:25B7
+INT34				  Near	 DGROUP:25BC
+INT35				  Near	 DGROUP:25C1
+INT36				  Near	 DGROUP:25C6
+INT37				  Near	 DGROUP:25CB
+INT38				  Near	 DGROUP:25D0
+INT39				  Near	 DGROUP:25D5
+INT4				  Near	 DGROUP:2526
+INT40				  Near	 DGROUP:25DA
+INT41				  Near	 DGROUP:25DF
+INT42				  Near	 DGROUP:25E4
+INT43				  Near	 DGROUP:25E9
+INT44				  Near	 DGROUP:25EE
+INT45				  Near	 DGROUP:25F3
+INT46				  Near	 DGROUP:25F8
+INT47				  Near	 DGROUP:25FD
+INT48				  Near	 DGROUP:2602
+INT49				  Near	 DGROUP:2607
+INT5				  Near	 DGROUP:252B
+INT50				  Near	 DGROUP:260C
+INT51				  Near	 DGROUP:2611
+INT52				  Near	 DGROUP:2616
+INT53				  Near	 DGROUP:261B
+INT54				  Near	 DGROUP:2620
+INT55				  Near	 DGROUP:2625
+INT56				  Near	 DGROUP:262A
+INT57				  Near	 DGROUP:262F
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 49
+Symbol Table
+
+
+
+INT58				  Near	 DGROUP:2634
+INT59				  Near	 DGROUP:2639
+INT6				  Near	 DGROUP:2530
+INT60				  Near	 DGROUP:263E
+INT61				  Near	 DGROUP:2643
+INT62				  Near	 DGROUP:2648
+INT63				  Near	 DGROUP:264D
+INT7				  Near	 DGROUP:2535
+INT8				  Near	 DGROUP:253A
+INT9				  Near	 DGROUP:253F
+INTABT				  Near	 DGROUP:276B
+INTCONTNO			  Byte	 DGROUP:01B6
+INTCONTROLLER			  Byte	 DGROUP:01A0
+INTDUMP				  Near	 DGROUP:2652
+INTL1				  Near	 DGROUP:2687
+INTL2				  Near	 DGROUP:26AE
+INTL3				  Near	 DGROUP:273C
+INTMASK1			  Byte	 DGROUP:010D
+INTMASK2			  Byte	 DGROUP:010E
+INTNO				  Number 0040
+INTSP				  Word	 DGROUP:010A
+INTSTATE			  Byte	 DGROUP:010C
+INVALIDHEX			  Byte	 DGROUP:32B2
+IOMAPEND			  Byte	 DGROUP:225A
+IOPORTMAP			  Byte	 DGROUP:025A
+IRQSET				  Near	 DGROUP:2A6B
+LENGTH_LOOP			  Near	 DGROUP:3186
+LF				  Near	 DGROUP:2497
+LOGGINGMSG			  Byte	 DGROUP:3290
+LSP1				  Near	 DGROUP:269F
+MAKEINSTR			  Near	 DGROUP:2945
+MEMMSG				  Byte	 DGROUP:015D
+MOVTOCRX			  Near	 DGROUP:294A
+NOCRINT				  Near	 DGROUP:26B6
+NOESP				  Near	 DGROUP:26D9
+NOHIGHLIGHT			  Near	 DGROUP:275B
+NOMEMDUMP			  Near	 DGROUP:27EC
+NOSCR				  Near	 DGROUP:274A
+NOSCROLL			  Near	 DGROUP:24C8
+NOTIO				  Near	 DGROUP:2670
+NOVALIDCMD			  Near	 DGROUP:2DE7
+OUCHD				  Near	 DGROUP:249A
+OUT@@_AL			  Near	 DGROUP:287C
+OUTCHAR				  Near	 DGROUP:2454
+OUTDX_AL			  Near	 DGROUP:284B
+OUTPORT				  Word	 DGROUP:0107
+OUTPUT				  Near	 DGROUP:242E
+P0ESP				  Near	 DGROUP:2360
+PATCHCS1			  Number DGROUP:23EE
+PATCHCS2			  Number DGROUP:29D2
+PL0STACK			  Number 0040
+PMINSTR				  Near	 DGROUP:2912
+PMINTERRUPTS			  Number 0000
+PORT				  Near	 DGROUP:282C
+PORTHANDLER			  Text	 port.asm
+PRINTANDEXIT			  Near	 DGROUP:2F44
+PRINT_HEX_DIGIT			  Near	 DGROUP:3235
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 50
+Symbol Table
+
+
+
+PRINT_INT_HEX			  Near	 DGROUP:3219
+PSESP				  Near	 DGROUP:23A0
+READPORT			  Near	 DGROUP:2886
+RETURN				  Byte	 DGROUP:326A
+RMESP				  Dword	 DGROUP:0119
+RMSS				  Word	 DGROUP:011D
+RTABLE				  Byte	 DGROUP:0148
+SAVEDIDT			  Qword	 DGROUP:010F
+SELECTORSETUP			  Near	 DGROUP:2EEB
+SETA20				  Near	 DGROUP:2E84
+SETPIC				  Near	 DGROUP:23A0
+SETUP_IOMAP			  Near	 DGROUP:2D1F
+SIM13				  Near	 DGROUP:290D
+SPACE				  Byte	 DGROUP:3266
+STACKMSG			  Byte	 DGROUP:0141
+START				  Near	 DGROUP:0100
+STARTIOPL			  Number 3000
+STARTPORT			  Word	 DGROUP:0103
+START_V86			  Near	 DGROUP:2DB1
+STRING_COMPARE			  Near	 DGROUP:319C
+STRING_LENGTH			  Near	 DGROUP:30D6
+STRING_PARSE			  Near	 DGROUP:311D
+STRING_TO_INT_HEX		  Near	 DGROUP:31B7
+STRING_UPPERCASE		  Near	 DGROUP:30F2
+SWITCHTOPM			  Near	 DGROUP:2F7F
+SWITCHTOVM86			  Near	 DGROUP:3093
+TASKMSG				  Byte	 DGROUP:0137
+TASKSEGMENT			  Struct DGROUP:01F2 TSSBLK
+TEMP1				  Dword	 DGROUP:0127
+TEMP2				  Dword	 DGROUP:012B
+TEMP3				  Dword	 DGROUP:012F
+TEMP4				  Dword	 DGROUP:0133
+THREEBYTES			  Near	 DGROUP:292A
+TITLEMSG			  Byte	 DGROUP:324C
+TOOBAD				  Near	 DGROUP:28C5
+TOPINT				  Number 003F
+UNEXPMSG			  Byte	 DGROUP:013B
+V86SUCCESSMSG			  Byte	 DGROUP:326D
+VM86SP				  Near	 DGROUP:2260
+VM86STACK			  Number 0001
+WRITEMSG			  Near	 DGROUP:2503
+WRITEPORT			  Near	 DGROUP:284C
+WRITE_LOOP			  Near	 DGROUP:318F
+WRITE_STRING			  Near	 DGROUP:3181
+
+Macro Name
+
+ADJUST
+BREAK
+DEFINT
+GDTDESCR
+IDTDESCR
+SETADDR
+SETDT
+SETTLEBUS
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 51
+Symbol Table
+
+
+
+
+Structure Name			  Type	Offset
+
+DESC386
+ SEGLIMIT			  Word	 0000
+ BASE0TO15			  Word	 0002
+ BASE16TO23			  Byte	 0004
+ ACCESSRIGHTS			  Byte	 0005
+ GRANULARITY			  Byte	 0006
+ BASE24TO31			  Byte	 0007
+DT386
+ TABLESIZE			  Word	 0000
+ TABLEADDR			  Dword	 0002
+I30PARMBLOCK
+ I30FLAG			  Dword	 0000
+ I30INTNO			  Byte	 0004
+ I30EFLAGS			  Dword	 0008
+ I30ESP				  Dword	 000C
+ I30SS				  Dword	 0010
+ I30ES				  Dword	 0014
+ I30DS				  Dword	 0018
+ I30FS				  Dword	 001C
+ I30GS				  Dword	 0020
+ I30EBP				  Dword	 0024
+ I30EBX				  Dword	 0028
+TSSBLK
+ TSSLINK			  Dword	 0000
+ TSSESPP0			  Dword	 0004
+ TSSSSP0			  Dword	 0008
+ TSSESPP1			  Dword	 000C
+ TSSSSP1			  Dword	 0010
+ TSSESPP2			  Dword	 0014
+ TSSSSP2			  Dword	 0018
+ TSSCR3				  Dword	 001C
+ TSSEIP				  Dword	 0020
+ TSSEFLAGS			  Dword	 0024
+ TSSEAX				  Dword	 0028
+ TSSECX				  Dword	 002C
+ TSSEDX				  Dword	 0030
+ TSSEBX				  Dword	 0034
+ TSSESP				  Dword	 0038
+ TSSEBP				  Dword	 003C
+ TSSESI				  Dword	 0040
+ TSSEDI				  Dword	 0044
+ TSSES				  Dword	 0048
+ TSSCS				  Dword	 004C
+ TSSSS				  Dword	 0050
+ TSSDS				  Dword	 0054
+ TSSFS				  Dword	 0058
+ TSSGS				  Dword	 005C
+ TSSLDT				  Dword	 0060
+ TSSIOMAP			  Word	 0066
+Turbo Assembler	 Version 4.1	    09/06/21 11:13:59	    Page 52
+Symbol Table
+
+
+
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _DATA				  16  0000 Word	  Public  DATA
+  _TEXT				  16  3366 Word	  Public  CODE
+
