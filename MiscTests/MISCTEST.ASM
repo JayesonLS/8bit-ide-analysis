@@ -66,6 +66,7 @@ Rapid320Write:
 		mov	al, byte ptr [di]
 		inc	di
 		out dx, al
+		call ShortDelay
 		jmp	.Rapid320WriteLoop
 
 
@@ -85,10 +86,12 @@ Rapid320RepnzWrite:
 		mov	dx, offset ForeverMsg
 		call PrintString
 .Rapid320RepnzWriteLoop:
+		mov	dx, 320h
 		mov	cx, 16
 		mov	si, offset ReadWriteBuffer
 		cld
 		repnz outsb
+		call ShortDelay
 		jmp .Rapid320RepnzWriteLoop
 
 
@@ -98,10 +101,12 @@ Rapid320RepnzRead:
 .Rapid320RepnzReadLoop:
 		push cs
 		pop es
+		mov	dx, 320h
 		mov	cx, 16
 		mov	di, offset ReadWriteBuffer
 		cld
 		repnz insb
+		call ShortDelay
 		jmp .Rapid320RepnzReadLoop
 
 
@@ -111,6 +116,30 @@ PrintString proc near
 		mov	ah, 9
 		int	021h
 		pop ax
+		ret
+		endp
+
+ShortDelay proc near
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
 		ret
 		endp
 
