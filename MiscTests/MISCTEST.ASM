@@ -40,19 +40,44 @@ TerminateProgram:
 		int	021h
 
 
+		; This operation is consistent with how the ST05X BIOS
+		; writes 6 command bytes to the controller.
 Rapid320Write:
 		mov	dx, offset ForeverMsg
 		call PrintString
 .Rapid320WriteLoop:
-			
+		mov	dx, 320h
+		mov di, offset ReadWriteBuffer
+		mov	al, byte ptr [di]
+		inc	di
+		out dx, al
+		mov	al, byte ptr [di]
+		inc	di
+		out dx, al
+		mov	al, byte ptr [di]
+		inc	di
+		out dx, al
+		mov	al, byte ptr [di]
+		inc	di
+		out dx, al
+		mov	al, byte ptr [di]
+		inc	di
+		out dx, al
+		mov	al, byte ptr [di]
+		inc	di
+		out dx, al
 		jmp	.Rapid320WriteLoop
 
 
+		; This operation is a guess at how something might poll for a status result.
 Rapid320Read:
 		mov	dx, offset ForeverMsg
 		call PrintString
+		mov dx, 320
 .Rapid320ReadLoop:
-			
+		in	al, dx
+		xor	al, al	; Intentionaly do a test that always loops. Real code would to an or / test.
+		jz	.Rapid320ReadLoop
 		jmp	.Rapid320ReadLoop
 
 
@@ -61,9 +86,9 @@ Rapid320RepnzWrite:
 		call PrintString
 .Rapid320RepnzWriteLoop:
 		mov	cx, 16
-.Rapid320RepnzWriteInnerLoop:
-
-		loop .Rapid320RepnzWriteInnerLoop
+		mov	si, offset ReadWriteBuffer
+		cld
+		repnz outsb
 		jmp .Rapid320RepnzWriteLoop
 
 
@@ -71,11 +96,14 @@ Rapid320RepnzRead:
 		mov	dx, offset ForeverMsg
 		call PrintString
 .Rapid320RepnzReadLoop:
+		push cs
+		pop es
 		mov	cx, 16
-.Rapid320RepnzReadInnerLoop:
-
-		loop .Rapid320RepnzReadInnerLoop
+		mov	di, offset ReadWriteBuffer
+		cld
+		repnz insb
 		jmp .Rapid320RepnzReadLoop
+
 
 		; Print $ terminated string pointed to by dx
 PrintString proc near
