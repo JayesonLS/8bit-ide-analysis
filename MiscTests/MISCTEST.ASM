@@ -120,26 +120,11 @@ PrintString proc near
 		endp
 
 ShortDelay proc near
-		nop
-		nop
-		nop
-		nop
-		nop
-		nop
-		nop
-		nop
-		nop
-		nop
-		nop
-		nop
-		nop
-		nop
-		nop
-		nop
-		nop
-		nop
-		nop
-		nop
+		push cx
+		mov cx, 100h
+.ShortDelayLoop:
+		loop .ShortDelayLoop
+		pop cx
 		ret
 		endp
 

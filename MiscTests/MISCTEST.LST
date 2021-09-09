@@ -1,4 +1,4 @@
-Turbo Assembler	 Version 4.1	    09/09/21 10:37:03	    Page 1
+Turbo Assembler	 Version 4.1	    09/09/21 10:54:16	    Page 1
 MiscTest.ASM
 
 
@@ -13,7 +13,7 @@ MiscTest.ASM
       8
       9
      10	0100			     Start:
-     11	0100  BA 01DAr				     mov     dx, offset	WelcomeMsg
+     11	0100  BA 01CDr				     mov     dx, offset	WelcomeMsg
      12	0103  E8 0094				     call PrintString
      13
      14	0106  A0 0080				     mov     al, ds:[80h]	     ; Check that length of command line is 2	    +
@@ -33,10 +33,10 @@ MiscTest.ASM
      28	011A  32 E4				     xor     ah,ah
      29	011C  D1 E0				     shl ax,1
      30	011E  8B F0				     mov si, ax
-     31	0120  FF A4 01B6r			     jmp     OpTable[si]
+     31	0120  FF A4 01A9r			     jmp     OpTable[si]
      32
      33	0124			     BadCommandLine:
-     34	0124  BA 01EDr				     mov     dx, offset	HelpMsg
+     34	0124  BA 01E0r				     mov     dx, offset	HelpMsg
      35	0127  E8 0070				     call PrintString
      36
      37	012A  EB 01 90				     jmp     TerminateProgram
@@ -49,18 +49,18 @@ MiscTest.ASM
      44						     ; This operation is consistent with how the ST05X BIOS
      45						     ; writes 6	command	bytes to the controller.
      46	0131			     Rapid320Write:
-     47	0131  BA 0306r				     mov     dx, offset	ForeverMsg
+     47	0131  BA 02F9r				     mov     dx, offset	ForeverMsg
      48	0134  E8 0063				     call PrintString
      49	0137			     .Rapid320WriteLoop:
      50	0137  BA 0320				     mov     dx, 320h
-     51	013A  BF 01CAr				     mov di, offset ReadWriteBuffer
+     51	013A  BF 01BDr				     mov di, offset ReadWriteBuffer
      52	013D  8A 05				     mov     al, byte ptr [di]
      53	013F  47				     inc     di
      54	0140  EE				     out dx, al
      55	0141  8A 05				     mov     al, byte ptr [di]
      56	0143  47				     inc     di
      57	0144  EE				     out dx, al
-Turbo Assembler	 Version 4.1	    09/09/21 10:37:03	    Page 2
+Turbo Assembler	 Version 4.1	    09/09/21 10:54:16	    Page 2
 MiscTest.ASM
 
 
@@ -83,7 +83,7 @@ MiscTest.ASM
      73
      74						     ; This operation is a guess at how	something might	poll for a status result.
      75	015A			     Rapid320Read:
-     76	015A  BA 0306r				     mov     dx, offset	ForeverMsg
+     76	015A  BA 02F9r				     mov     dx, offset	ForeverMsg
      77	015D  E8 003A				     call PrintString
      78	0160  BA 0140				     mov dx, 320
      79	0163			     .Rapid320ReadLoop:
@@ -95,12 +95,12 @@ MiscTest.ASM
      85
      86
      87	016A			     Rapid320RepnzWrite:
-     88	016A  BA 0306r				     mov     dx, offset	ForeverMsg
+     88	016A  BA 02F9r				     mov     dx, offset	ForeverMsg
      89	016D  E8 002A				     call PrintString
      90	0170			     .Rapid320RepnzWriteLoop:
      91	0170  BA 0320				     mov     dx, 320h
      92	0173  B9 0010				     mov     cx, 16
-     93	0176  BE 01CAr				     mov     si, offset	ReadWriteBuffer
+     93	0176  BE 01BDr				     mov     si, offset	ReadWriteBuffer
      94	0179  FC				     cld
      95	017A  F2> 6E				     repnz outsb
      96	017C  E8 0022				     call ShortDelay
@@ -108,21 +108,21 @@ MiscTest.ASM
      98
      99
     100	0181			     Rapid320RepnzRead:
-    101	0181  BA 0306r				     mov     dx, offset	ForeverMsg
+    101	0181  BA 02F9r				     mov     dx, offset	ForeverMsg
     102	0184  E8 0013				     call PrintString
     103	0187			     .Rapid320RepnzReadLoop:
     104	0187  0E				     push cs
     105	0188  07				     pop es
     106	0189  BA 0320				     mov     dx, 320h
     107	018C  B9 0010				     mov     cx, 16
-    108	018F  BF 01CAr				     mov     di, offset	ReadWriteBuffer
+    108	018F  BF 01BDr				     mov     di, offset	ReadWriteBuffer
     109	0192  FC				     cld
     110	0193  F2> 6C				     repnz insb
     111	0195  E8 0009				     call ShortDelay
     112	0198  EB ED				     jmp .Rapid320RepnzReadLoop
     113
     114
-Turbo Assembler	 Version 4.1	    09/09/21 10:37:03	    Page 3
+Turbo Assembler	 Version 4.1	    09/09/21 10:54:16	    Page 3
 MiscTest.ASM
 
 
@@ -137,108 +137,93 @@ MiscTest.ASM
     122	01A1					     endp
     123
     124	01A1			     ShortDelay	proc near
-    125	01A1  90				     nop
-    126	01A2  90				     nop
-    127	01A3  90				     nop
-    128	01A4  90				     nop
-    129	01A5  90				     nop
-    130	01A6  90				     nop
-    131	01A7  90				     nop
-    132	01A8  90				     nop
-    133	01A9  90				     nop
-    134	01AA  90				     nop
-    135	01AB  90				     nop
-    136	01AC  90				     nop
-    137	01AD  90				     nop
-    138	01AE  90				     nop
-    139	01AF  90				     nop
-    140	01B0  90				     nop
-    141	01B1  90				     nop
-    142	01B2  90				     nop
-    143	01B3  90				     nop
-    144	01B4  90				     nop
-    145	01B5  C3				     ret
-    146	01B6					     endp
+    125	01A1  51				     push cx
+    126	01A2  B9 0100				     mov cx, 100h
+    127	01A5			     .ShortDelayLoop:
+    128	01A5  E2 FE				     loop .ShortDelayLoop
+    129	01A7  59				     pop cx
+    130	01A8  C3				     ret
+    131	01A9					     endp
+    132
+    133	01A9  0131r		     OpTable dw	     Rapid320Write	     ; 0
+    134	01AB  015Ar				     dw	     Rapid320Read	     ; 1
+    135	01AD  016Ar				     dw	     Rapid320RepnzWrite	     ; 2
+    136	01AF  0181r				     dw	     Rapid320RepnzRead	     ; 3
+    137	01B1  0124r				     dw	     BadCommandLine	     ; 4
+    138	01B3  0124r				     dw	     BadCommandLine	     ; 5
+    139	01B5  0124r				     dw	     BadCommandLine	     ; 6
+    140	01B7  0124r				     dw	     BadCommandLine	     ; 7
+    141	01B9  0124r				     dw	     BadCommandLine	     ; 8
+    142	01BB  0124r				     dw	     BadCommandLine	     ; 9
+    143
+    144	01BD  00 01 02 03 04 05	06+  ReadWriteBuffer db	     0,	1, 2, 3, 4, 5, 6, 7, 8,	9, 10, 11, 12, 13, 14, 15
+    145	      07 08 09 0A 0B 0C	0D+
+    146	      0E 0F
     147
-    148	01B6  0131r		     OpTable dw	     Rapid320Write	     ; 0
-    149	01B8  015Ar				     dw	     Rapid320Read	     ; 1
-    150	01BA  016Ar				     dw	     Rapid320RepnzWrite	     ; 2
-    151	01BC  0181r				     dw	     Rapid320RepnzRead	     ; 3
-    152	01BE  0124r				     dw	     BadCommandLine	     ; 4
-    153	01C0  0124r				     dw	     BadCommandLine	     ; 5
-    154	01C2  0124r				     dw	     BadCommandLine	     ; 6
-    155	01C4  0124r				     dw	     BadCommandLine	     ; 7
-    156	01C6  0124r				     dw	     BadCommandLine	     ; 8
-    157	01C8  0124r				     dw	     BadCommandLine	     ; 9
-    158
-    159	01CA  00 01 02 03 04 05	06+  ReadWriteBuffer db	     0,	1, 2, 3, 4, 5, 6, 7, 8,	9, 10, 11, 12, 13, 14, 15
-    160	      07 08 09 0A 0B 0C	0D+
-    161	      0E 0F
-    162
-    163	01DA  4D 69 73 63 20 54	65+  WelcomeMsg	     db	     "Misc Tests v 0.1", 10, 13, '$'
-    164	      73 74 73 20 76 20	30+
-    165	      2E 31 0A 0D 24
-    166
-    167	01ED  55 73 61 67 65 3A	20+  HelpMsg	     db	     "Usage: misctest <option> where <option> is 0 through 9", 10, 13
-    168	      6D 69 73 63 74 65	73+
-    169	      74 20 3C 6F 70 74	69+
-    170	      6F 6E 3E 20 77 68	65+
-    171	      72 65 20 3C 6F 70	74+
-Turbo Assembler	 Version 4.1	    09/09/21 10:37:03	    Page 4
+    148	01CD  4D 69 73 63 20 54	65+  WelcomeMsg	     db	     "Misc Tests v 0.1", 10, 13, '$'
+    149	      73 74 73 20 76 20	30+
+    150	      2E 31 0A 0D 24
+    151
+    152	01E0  55 73 61 67 65 3A	20+  HelpMsg	     db	     "Usage: misctest <option> where <option> is 0 through 9", 10, 13
+    153	      6D 69 73 63 74 65	73+
+    154	      74 20 3C 6F 70 74	69+
+    155	      6F 6E 3E 20 77 68	65+
+    156	      72 65 20 3C 6F 70	74+
+    157	      69 6F 6E 3E 20 69	73+
+    158	      20 30 20 74 68 72	6F+
+    159	      75 67 68 20 39 0A	0D
+    160	0218  20 20 20 20 20 20	20+			     db	     "	     misctest 0	- Do 6 rapid 0x320 writes forever", 10,	13
+    161	      6D 69 73 63 74 65	73+
+    162	      74 20 30 20 2D 20	44+
+    163	      6F 20 36 20 72 61	70+
+    164	      69 64 20 30 78 33	32+
+    165	      30 20 77 72 69 74	65+
+    166	      73 20 66 6F 72 65	76+
+    167	      65 72 0A 0D
+    168	024D  20 20 20 20 20 20	20+			     db	     "	     misctest 1	- Do 6 rapid 0x320 reads forever", 10, 13
+    169	      6D 69 73 63 74 65	73+
+    170	      74 20 31 20 2D 20	44+
+    171	      6F 20 36 20 72 61	70+
+Turbo Assembler	 Version 4.1	    09/09/21 10:54:16	    Page 4
 MiscTest.ASM
 
 
 
-    172	      69 6F 6E 3E 20 69	73+
-    173	      20 30 20 74 68 72	6F+
-    174	      75 67 68 20 39 0A	0D
-    175	0225  20 20 20 20 20 20	20+			     db	     "	     misctest 0	- Do 6 rapid 0x320 writes forever", 10,	13
-    176	      6D 69 73 63 74 65	73+
-    177	      74 20 30 20 2D 20	44+
-    178	      6F 20 36 20 72 61	70+
-    179	      69 64 20 30 78 33	32+
-    180	      30 20 77 72 69 74	65+
-    181	      73 20 66 6F 72 65	76+
-    182	      65 72 0A 0D
-    183	025A  20 20 20 20 20 20	20+			     db	     "	     misctest 1	- Do 6 rapid 0x320 reads forever", 10, 13
-    184	      6D 69 73 63 74 65	73+
-    185	      74 20 31 20 2D 20	44+
-    186	      6F 20 36 20 72 61	70+
-    187	      69 64 20 30 78 33	32+
-    188	      30 20 72 65 61 64	73+
-    189	      20 66 6F 72 65 76	65+
-    190	      72 0A 0D
-    191	028E  20 20 20 20 20 20	20+			     db	     "	     misctest 2	- Do 16	rapid 0x320 repnz writes forever",  +
-    192	      6D 69 73 63 74 65	73+  10, 13
-    193	      74 20 32 20 2D 20	44+
-    194	      6F 20 31 36 20 72	61+
-    195	      70 69 64 20 30 78	33+
-    196	      32 30 20 72 65 70	6E+
-    197	      7A 20 77 72 69 74	65+
-    198	      73 20 66 6F 72 65	76+
-    199	      65 72 0A 0D
-    200	02CA  20 20 20 20 20 20	20+			     db	     "	     misctest 3	- Do 16	rapid 0x320 repnz reads	forever",   +
-    201	      6D 69 73 63 74 65	73+  10, 13
-    202	      74 20 33 20 2D 20	44+
-    203	      6F 20 31 36 20 72	61+
-    204	      70 69 64 20 30 78	33+
-    205	      32 30 20 72 65 70	6E+
-    206	      7A 20 72 65 61 64	73+
-    207	      20 66 6F 72 65 76	65+
-    208	      72 0A 0D
-    209	0305  24					     db	     '$'
-    210
-    211	0306  4E 6F 74 65 3A 20	54+  ForeverMsg	     db	"Note: This operation will run forever (locks system)",	10, 13,	'$'
-    212	      68 69 73 20 6F 70	65+
-    213	      72 61 74 69 6F 6E	20+
-    214	      77 69 6C 6C 20 72	75+
-    215	      6E 20 66 6F 72 65	76+
-    216	      65 72 20 28 6C 6F	63+
-    217	      6B 73 20 73 79 73	74+
-    218	      65 6D 29 0A 0D 24
-    219
-    220						     end     Start
-Turbo Assembler	 Version 4.1	    09/09/21 10:37:03	    Page 5
+    172	      69 64 20 30 78 33	32+
+    173	      30 20 72 65 61 64	73+
+    174	      20 66 6F 72 65 76	65+
+    175	      72 0A 0D
+    176	0281  20 20 20 20 20 20	20+			     db	     "	     misctest 2	- Do 16	rapid 0x320 repnz writes forever",  +
+    177	      6D 69 73 63 74 65	73+  10, 13
+    178	      74 20 32 20 2D 20	44+
+    179	      6F 20 31 36 20 72	61+
+    180	      70 69 64 20 30 78	33+
+    181	      32 30 20 72 65 70	6E+
+    182	      7A 20 77 72 69 74	65+
+    183	      73 20 66 6F 72 65	76+
+    184	      65 72 0A 0D
+    185	02BD  20 20 20 20 20 20	20+			     db	     "	     misctest 3	- Do 16	rapid 0x320 repnz reads	forever",   +
+    186	      6D 69 73 63 74 65	73+  10, 13
+    187	      74 20 33 20 2D 20	44+
+    188	      6F 20 31 36 20 72	61+
+    189	      70 69 64 20 30 78	33+
+    190	      32 30 20 72 65 70	6E+
+    191	      7A 20 72 65 61 64	73+
+    192	      20 66 6F 72 65 76	65+
+    193	      72 0A 0D
+    194	02F8  24					     db	     '$'
+    195
+    196	02F9  4E 6F 74 65 3A 20	54+  ForeverMsg	     db	"Note: This operation will run forever (locks system)",	10, 13,	'$'
+    197	      68 69 73 20 6F 70	65+
+    198	      72 61 74 69 6F 6E	20+
+    199	      77 69 6C 6C 20 72	75+
+    200	      6E 20 66 6F 72 65	76+
+    201	      65 72 20 28 6C 6F	63+
+    202	      6B 73 20 73 79 73	74+
+    203	      65 6D 29 0A 0D 24
+    204
+    205						     end     Start
+Turbo Assembler	 Version 4.1	    09/09/21 10:54:16	    Page 5
 Symbol Table
 
 
@@ -250,9 +235,10 @@ Symbol Name			  Type	 Value
 .RAPID320REPNZREADLOOP		  Near	 DGROUP:0187
 .RAPID320REPNZWRITELOOP		  Near	 DGROUP:0170
 .RAPID320WRITELOOP		  Near	 DGROUP:0137
+.SHORTDELAYLOOP			  Near	 DGROUP:01A5
 ??DATE				  Text	 "09/09/21"
 ??FILENAME			  Text	 "MiscTest"
-??TIME				  Text	 "10:37:03"
+??TIME				  Text	 "10:54:16"
 ??VERSION			  Number 040A
 @32BIT				  Text	 0
 @CODE				  Text	 DGROUP
@@ -267,23 +253,23 @@ Symbol Name			  Type	 Value
 @STACK				  Text	 DGROUP
 @WORDSIZE			  Text	 2
 BADCOMMANDLINE			  Near	 DGROUP:0124
-FOREVERMSG			  Byte	 DGROUP:0306
-HELPMSG				  Byte	 DGROUP:01ED
-OPTABLE				  Word	 DGROUP:01B6
+FOREVERMSG			  Byte	 DGROUP:02F9
+HELPMSG				  Byte	 DGROUP:01E0
+OPTABLE				  Word	 DGROUP:01A9
 PRINTSTRING			  Near	 DGROUP:019A
 RAPID320READ			  Near	 DGROUP:015A
 RAPID320REPNZREAD		  Near	 DGROUP:0181
 RAPID320REPNZWRITE		  Near	 DGROUP:016A
 RAPID320WRITE			  Near	 DGROUP:0131
-READWRITEBUFFER			  Byte	 DGROUP:01CA
+READWRITEBUFFER			  Byte	 DGROUP:01BD
 SHORTDELAY			  Near	 DGROUP:01A1
 START				  Near	 DGROUP:0100
 TERMINATEPROGRAM		  Near	 DGROUP:012D
-WELCOMEMSG			  Byte	 DGROUP:01DA
+WELCOMEMSG			  Byte	 DGROUP:01CD
 
 Groups & Segments		  Bit Size Align  Combine Class
 
 DGROUP				  Group
   _DATA				  16  0000 Word	  Public  DATA
-  _TEXT				  16  033D Word	  Public  CODE
+  _TEXT				  16  0330 Word	  Public  CODE
 
